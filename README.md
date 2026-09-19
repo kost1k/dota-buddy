@@ -1,33 +1,40 @@
 # Dota Buddy
 
-Локальный overlay-виджет для стрима Dota 2 с реакцией в реальном времени на события матча.
+Локальный overlay-виджет для стрима Dota 2. В углу экрана живёт **бадди** —
+существо с глазом, которое переживает матч вместе со стримером: радуется,
+напрягается, паникует, съёживается при смерти и растёт по ходу игры.
 
-## Что уже реализовано
+Это эмоциональный компаньон, а не приборная панель: состояние читается даже
+зрителем, который про Доту не знает ничего.
 
-- Прием данных из Dota 2 Game State Integration через `POST /api/gsi`
-- Трансляция состояния в браузер через WebSocket `ws://localhost:3000/ws`
-- Реактивный overlay на Nuxt/Vue:
-  - 3D-объект (`TresJS`) с анимациями
-  - состояние смерти (`death`) и level-up flash
-  - динамический `sweatLevel` на базе GPM/XPM/Kills
-  - kill streak-цвета и компактная карточка метрик
+> **Статус: редизайн.** Пайплайн приёма данных работает и остаётся.
+> Клиентская часть переписывается — прототип был проверкой идеи, а не
+> желаемым результатом. Конструкция зафиксирована в
+> [`.scratch/buddy-redesign/spec.md`](.scratch/buddy-redesign/spec.md),
+> ход работ — в [`docs/roadmap.md`](docs/roadmap.md).
 
-## Текущий стек
+## Как это работает
+
+```
+Dota 2  ──POST /api/gsi──▶  Nitro  ──WebSocket /ws──▶  Overlay (Nuxt + TresJS)
+         снапшот ~1 Гц       вывод событий              аффект по rAF
+```
+
+Dota 2 шлёт снапшоты состояния через Game State Integration примерно раз в
+секунду. Сервер сравнивает соседние снапшоты, выводит из них события
+(смерть, респавн, байбек, талант, аганим) и транслирует нормализованный
+поток в браузер. Клиент интегрирует настроение бадди между пакетами — пакет
+это ключевой кадр, а не тик анимации.
+
+## Стек
 
 - Nuxt 4 + Nitro + CrossWS
-- Vue 3 + Composition API
+- Vue 3, Composition API
 - `@vueuse/core` (`useWebSocket`)
-- `@tresjs/core` / `@tresjs/nuxt`
+- `@tresjs/core` / `@tresjs/nuxt` (Three.js)
 - GSAP
-
-## Структура проекта (ключевое)
-
-- `app/app.vue` - главный overlay UI и реакция на входящие WS-сообщения
-- `app/components/BuddyScene.vue` - контейнер 3D-сцены
-- `app/components/BuddyObject.vue` - анимации и логика 3D-объекта
-- `server/api/gsi.post.ts` - входящий GSI webhook
-- `server/routes/ws.ts` - обработчик WebSocket-подключений
-- `server/utils/ws.ts` - broadcast-сервис для WS
+- `dotaconstants` — обязательная зависимость: GSI присылает текущий кулдаун,
+  но не максимальный
 
 ## Локальный запуск
 
@@ -37,47 +44,85 @@ cp .env.example .env
 bun run dev
 ```
 
-Приложение стартует на `http://localhost:3000`, WebSocket endpoint - `/ws`.
-
-### Служебный endpoint
-
-- `GET /api/health` - быстрый статус сервера (`status`, `timestamp`, `uptimeSec`, `wsPeers`, `logLevel`)
+Приложение стартует на `http://localhost:3000`, WebSocket — `/ws`.
 
 ### Runtime-переменные
 
-- `NUXT_PUBLIC_WS_URL` - URL для подключения overlay к WebSocket
-- `NUXT_PUBLIC_IDLE_TIMEOUT_MS` - таймаут без входящих сообщений до перехода в empty state
-- `NUXT_GSI_SECRET` - shared secret для защиты `POST /api/gsi` (пустое значение отключает проверку)
-- `NUXT_LOG_LEVEL` - уровень серверных логов: `debug`, `info`, `silent`
+| Переменная | Назначение |
+| --- | --- |
+| `NUXT_PUBLIC_WS_URL` | URL WebSocket для оверлея |
+| `NUXT_PUBLIC_IDLE_TIMEOUT_MS` | таймаут без входящих сообщений до перехода в сон |
+| `NUXT_GSI_SECRET` | shared secret для `POST /api/gsi` (пусто — проверка выключена) |
+| `NUXT_LOG_LEVEL` | `debug`, `info` или `silent` |
 
-## Как подключить Dota 2 GSI
+### Служебный endpoint
 
-1. Скопировать шаблон `docs/examples/gamestate_integration_dota_buddy.cfg`
-2. Поместить файл в директорию Dota 2:
-   - `...\Steam\steamapps\common\dota 2 beta\game\dota\cfg\gamestate_integration\`
-3. Проверить endpoint в файле:
-   - локально: `http://127.0.0.1:3000/api/gsi`
-   - удаленно: свой публичный URL/туннель
-4. Если включена защита `NUXT_GSI_SECRET`, указать такой же токен в секции `auth.token` GSI-файла
-5. Запустить матч и убедиться, что overlay получает обновления
+`GET /api/health` — `status`, `timestamp`, `uptimeSec`, `wsPeers`, `logLevel`.
 
-### Примечание по auth
+## Разработка без Доты
 
-- Для локальных тестов можно оставить `NUXT_GSI_SECRET` пустым
-- Для стабильного использования лучше задать `NUXT_GSI_SECRET` и такой же `auth.token` в GSI-конфиге
-- Шаблон уже включает расширенные `data` поля (`buildings`, `draft`, `wearables`) для будущих фич, даже если сейчас они не используются в UI
+Машина разработки и машина для тестов — разные: Dota 2 и Streamlabs стоят
+только на игровом ПК. Поэтому оверлей проектируется так, чтобы его можно было
+полностью проверять без игры.
 
-## Ограничения текущей версии
+- **Пульт** — синтетические GSI-пакеты в `POST /api/gsi` (проверяет систему
+  целиком, включая серверный вывод событий) плюс прямой оверрайд осей
+  настроения для быстрой итерации визуала.
+- **Воспроизведение записи** — сохранённая GSI-сессия проигрывается в
+  реальном темпе. Тот же формат, что у пульта.
 
-- Сцена `BuddyScene` рендерится дважды (избыточная нагрузка)
-- Twitch/Unstorage/Supabase пока не интегрированы
+Выезд на игровой ПК тратится только на то, чего синтетикой не проверить:
+альфа в эфире, производительность, VRAM на длинном прогоне, реальная
+каденция GSI.
 
-## План ближайших улучшений
+## Подключение Dota 2 GSI
 
-См. `docs/roadmap.md`.
+1. Скопировать [`docs/examples/gamestate_integration_dota_buddy.cfg`](docs/examples/gamestate_integration_dota_buddy.cfg)
+   в `...\Steam\steamapps\common\dota 2 beta\game\dota\cfg\gamestate_integration\`
+2. Проверить `uri` в файле — локально `http://127.0.0.1:3000/api/gsi`
+3. Если задан `NUXT_GSI_SECRET`, указать такой же токен в секции `auth.token`
+4. Добавить в параметры запуска Dota 2: `-gamestateintegration`
+5. Запустить матч и убедиться, что оверлей получает обновления
 
-## Полезные документы
+## Подключение к OBS / Streamlabs
 
-- `docs/pre-stream-checklist.md` - чеклист перед эфиром
-- `docs/examples/gamestate_integration_dota_buddy.cfg` - шаблон GSI-конфига для Dota 2
-- `docs/session-handoff-2026-04-25.md` - итоги текущей сессии и next steps
+Browser Source на URL оверлея. Важное:
+
+- **«Enable Browser Source Hardware Acceleration» — оставить включённым.**
+  С выключенным каждый кадр 1080p стоит ~7.9 МиБ трафика CPU↔GPU.
+- **«Use custom frame rate» — оставить выключенным.** По умолчанию страница
+  залочена на выходной клок OBS, что и даёт ощущение 60 fps без рассинхрона.
+- **Приёмка визуала — в OBS, а не в браузере.** Полупрозрачные края в
+  browser source рендерятся иначе из-за открытых багов альфы
+  ([ADR-0003](docs/adr/0003-no-soft-glow-obs-constraints.md)).
+
+## Что оверлей знать не может
+
+В обычном матче GSI отдаёт **только героя самого игрока**: ни союзников, ни
+противников, ни состояния Рошана, ни `net_worth`. Всё кросс-командное
+доступно лишь наблюдателю. Это жёсткий потолок — подробности и источники в
+[`docs/research/gsi-data-surface.md`](docs/research/gsi-data-surface.md).
+
+## Документы
+
+| Файл | Что внутри |
+| --- | --- |
+| [`CONTEXT.md`](CONTEXT.md) | словарь терминов проекта |
+| [`docs/concept.md`](docs/concept.md) | продуктовая концепция |
+| [`.scratch/buddy-redesign/spec.md`](.scratch/buddy-redesign/spec.md) | полная конструкция и обоснования |
+| [`docs/adr/`](docs/adr/) | ключевые решения, которые дорого пересматривать |
+| [`docs/roadmap.md`](docs/roadmap.md) | рубежи и техдолг |
+| [`docs/research/`](docs/research/) | разведка по GSI и по OBS, с источниками |
+
+## Структура
+
+```
+app/            overlay UI (переписывается)
+server/
+  api/gsi.post.ts   входящий GSI webhook
+  routes/ws.ts      WebSocket-подключения
+  utils/ws.ts       broadcast-сервис
+  utils/logger.ts   уровни логирования
+docs/           документация, ADR, разведка
+.scratch/       спеки и тикеты работы, которая ведётся сейчас
+```
