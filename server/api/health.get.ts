@@ -1,3 +1,5 @@
+import process from 'node:process'
+
 export default defineEventHandler((event) => {
   const runtimeConfig = useRuntimeConfig(event)
 
