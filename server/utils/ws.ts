@@ -1,7 +1,20 @@
-export function broadcast(topic: string, message: any) {
-  // @ts-expect-error Nitro types are not fully compatible with Nuxt 4
-  const ws = import.meta.nitro.ws
-  if (ws) {
-    ws.publish(topic, JSON.stringify(message))
-  }
+import type { Peer } from 'crossws'
+
+const peers = new Set<Peer>()
+
+export const wsService = {
+  add: (peer: Peer) => peers.add(peer),
+  remove: (peer: Peer) => peers.delete(peer),
+  count: () => peers.size,
+  broadcast: (message: unknown) => {
+    const data = JSON.stringify(message)
+    peers.forEach((peer) => {
+      try {
+        peer.send(data)
+      }
+      catch {
+        peers.delete(peer)
+      }
+    })
+  },
 }

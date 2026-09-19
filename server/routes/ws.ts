@@ -1,25 +1,24 @@
+import { createLogger } from '../utils/logger'
+
 export default defineWebSocketHandler({
   open(peer) {
-    console.log('New client connected:', peer.id)
-    peer.subscribe('dota-events')
-  },
-
-  message(peer, message) {
-    const text = message.text()
-    console.log(`Message from ${peer.id}: ${text}`)
-
-    peer.publish('dota-events', {
-      sender: peer.id,
-      msg: text,
-      timestamp: Date.now(),
-    })
+    const runtimeConfig = useRuntimeConfig()
+    const logger = createLogger(runtimeConfig.logLevel)
+    wsService.add(peer)
+    logger.info('[ws] client connected', { peerId: peer.id, totalPeers: wsService.count() })
   },
 
   close(peer) {
-    console.log('Client disconnected:', peer.id)
+    const runtimeConfig = useRuntimeConfig()
+    const logger = createLogger(runtimeConfig.logLevel)
+    wsService.remove(peer)
+    logger.info('[ws] client disconnected', { peerId: peer.id, totalPeers: wsService.count() })
   },
 
   error(peer, error) {
-    console.error('WebSocket error:', error)
+    const runtimeConfig = useRuntimeConfig()
+    const logger = createLogger(runtimeConfig.logLevel)
+    wsService.remove(peer)
+    logger.error('[ws] connection error', { peerId: peer.id, totalPeers: wsService.count(), error })
   },
 })
