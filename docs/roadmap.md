@@ -40,9 +40,9 @@
 
 Проверка главной гипотезы до вложений в остальное.
 
-- [ ] [02](../.scratch/buddy-redesign/issues/02-client-shell.md) — каркас
+- [x] [02](../.scratch/buddy-redesign/issues/02-client-shell.md) — каркас
       нового клиента
-- [ ] [03](../.scratch/buddy-redesign/issues/03-control-panel-affect.md) —
+- [x] [03](../.scratch/buddy-redesign/issues/03-control-panel-affect.md) —
       пульт, уровень аффекта
 - [ ] [04](../.scratch/buddy-redesign/issues/04-buddy-eye-two-axes.md) —
       бадди с глазом на двух осях

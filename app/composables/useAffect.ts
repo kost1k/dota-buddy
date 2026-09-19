@@ -24,5 +24,16 @@ export function useAffect() {
     target.value = { ...target.value, ...next }
   }
 
-  return { state, target, tick, setTarget }
+  /**
+   * Прямая запись состояния, в обход инерции.
+   *
+   * Только для пульта. В рантайме оверлея состояние обязано меняться лишь
+   * через `tick`, иначе теряется плавность, ради которой выбрана
+   * непрерывная модель (ADR-0001).
+   */
+  function setState(next: Partial<AffectState>) {
+    state.value = { ...state.value, ...next }
+  }
+
+  return { state, target, tick, setTarget, setState }
 }
