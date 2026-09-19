@@ -48,7 +48,7 @@
       нового клиента
 - [x] [03](../.scratch/buddy-redesign/issues/03-control-panel-affect.md) —
       пульт, уровень аффекта
-- [ ] [04](../.scratch/buddy-redesign/issues/04-buddy-eye-two-axes.md) —
+- [x] [04](../.scratch/buddy-redesign/issues/04-buddy-eye-two-axes.md) —
       бадди с глазом на двух осях
 - [ ] [05](../.scratch/buddy-redesign/issues/05-affect-readability-check.md) —
       проверка читаемости на людях

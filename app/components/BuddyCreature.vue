@@ -3,54 +3,203 @@ import { useLoop } from '@tresjs/core'
 import { Color } from 'three'
 
 /**
- * ЗАГЛУШКА. Настоящее существо с глазом — тикет 04.
+ * Бадди — существо с глазом.
  *
- * Здесь минимальное тело, которое доказывает, что связка работает: аффект
- * тикает, обе оси доходят до сцены и видны раздельно. Валентность ведёт
- * цвет, возбуждение — скорость. Ни формы, ни глаза, ни характера тут нет и
- * быть не должно: они проектируются отдельно.
+ * Ядро с орбитами из прототипа стало ТЕЛОМ; глаз посажен в него спереди.
+ * Это принципиально: глаз в пустоте читается как жуткое наблюдающее око и
+ * противоречит характеру верного союзника (спека, §2.1). Тело, веки и брови
+ * окрашены одинаково, поэтому силуэт остаётся цельным.
+ *
+ * Распределение каналов (ADR-0001):
+ *
+ *   валентность -> цвет тела, наклон бровей, подъём нижнего века
+ *   возбуждение -> раскрытие век, скорость и амплитуда движения, дрожь
+ *
+ * Взгляд (направление внимания) в этот компонент не входит — рубеж 3.
+ *
+ * Прозрачности нет нигде, включая орбиты: ADR-0003.
  */
 
 const props = defineProps<{ asleep: boolean }>()
 
 const { state, tick } = useAffect()
 
+const rootRef = shallowRef()
 const bodyRef = shallowRef()
+const orbitsRef = shallowRef()
+const upperLidRef = shallowRef()
+const lowerLidRef = shallowRef()
+const irisRef = shallowRef()
 
-const low = new Color(theme.color.valenceLow)
-const high = new Color(theme.color.valenceHigh)
-const tint = new Color()
+const EYE_Z = 0.55
+const EYE_R = 0.58
+const LID_R = 0.62
+
+// Две, а не пять: на эфирном размере тонкие кольца читаются царапинами.
+const orbits = [
+  { rotation: [1.15, 0.3, 0.2] as const, radius: 1.36 },
+  { rotation: [-0.7, 0.9, -0.4] as const, radius: 1.5 },
+]
+
+const cold = new Color(theme.color.valenceLow)
+const warm = new Color(theme.color.valenceHigh)
+const bodyTint = new Color()
+const shadeTint = new Color()
+
+// Моргание: отдельный ритм, не связанный с аффектом. Без него существо
+// смотрит немигающим взглядом, и это ровно тот «жуткий глаз», от которого
+// мы уходим.
+let blinkCountdown = 2.5
+let blinkProgress = 1
 
 const { onBeforeRender } = useLoop()
 
-onBeforeRender(({ delta }) => {
+onBeforeRender(({ delta, elapsed }) => {
   // Дельта берётся из цикла TresJS, а не из собственных часов: под капотом
   // там THREE.Timer, подключённый к Page Visibility API. Когда страница
   // скрыта (OBS увёл сцену, вкладка в фоне), он останавливается и при
-  // возврате не выдаёт накопленный провал одним куском. Собственный
-  // performance.now() этого не умеет.
+  // возврате не выдаёт накопленный провал одним куском.
   tick(delta)
 
-  const body = bodyRef.value
-  if (!body)
-    return
-
   const { valence, arousal } = state.value
+  const sleepy = props.asleep ? 0.25 : 1
 
-  // Валентность: −1..1 -> 0..1 для смешивания цвета.
-  tint.copy(low).lerp(high, (valence + 1) / 2)
-  body.material.color.copy(tint)
+  // --- цвет: валентность температурой и насыщенностью ---
+  bodyTint.copy(cold).lerp(warm, (valence + 1) / 2)
+  if (bodyRef.value)
+    bodyRef.value.material.color.copy(bodyTint)
 
-  // Возбуждение ведёт скорость и амплитуду. Во сне движение почти замирает.
-  const liveliness = props.asleep ? 0.15 : 1
-  body.rotation.y += delta * (0.2 + arousal * 1.8) * liveliness
-  body.rotation.x += delta * (0.05 + arousal * 0.4) * liveliness
+  if (upperLidRef.value)
+    upperLidRef.value.material.color.copy(bodyTint)
+  if (lowerLidRef.value)
+    lowerLidRef.value.material.color.copy(bodyTint)
+
+  if (orbitsRef.value) {
+    shadeTint.copy(bodyTint).multiplyScalar(theme.creature.orbitShade)
+    orbitsRef.value.children.forEach((ring: any) => ring.material.color.copy(shadeTint))
+  }
+
+  // --- моргание ---
+  blinkCountdown -= delta
+  if (blinkCountdown <= 0) {
+    blinkProgress = 0
+    // На взводе моргает чаще и дёрганее, в покое — реже.
+    blinkCountdown = (4.5 - arousal * 2.2) * (0.7 + Math.random() * 0.6)
+  }
+  if (blinkProgress < 1)
+    blinkProgress = Math.min(1, blinkProgress + delta / 0.16)
+  const blink = Math.sin(Math.PI * blinkProgress) // 0 -> 1 -> 0
+
+  // --- веки: раскрытие ведёт возбуждение ---
+  const aperture = (0.22 + arousal * 1.05) * (1 - blink) * (props.asleep ? 0.35 : 1)
+  // Положительная валентность приподнимает нижнее веко — прищур довольства.
+  const lowerSquint = Math.max(0, valence) * 0.4
+  // Отрицательная — слегка опускает верхнее, взгляд тяжелеет.
+  const upperDrop = Math.max(0, -valence) * 0.18
+
+  if (upperLidRef.value) {
+    upperLidRef.value.rotation.x = -aperture * (1 - upperDrop)
+    upperLidRef.value.rotation.z = -valence * 0.12
+  }
+  if (lowerLidRef.value) {
+    lowerLidRef.value.rotation.x = aperture * (1 - lowerSquint)
+    lowerLidRef.value.rotation.z = -valence * 0.12
+  }
+
+  // Бровей здесь нет намеренно. На эфирном размере (силуэт ~135 px) бровь
+  // занимает 2-3 пикселя и читается шумом, а не мимикой. Валентность несут
+  // цвет и геометрия век — они крупномасштабные и выживают.
+
+  // --- зрачок: сужается при напряжении ---
+  if (irisRef.value) {
+    const s = 1 - Math.max(0, -valence) * 0.22 + arousal * 0.08
+    irisRef.value.scale.set(s, s, 0.34)
+  }
+
+  // --- движение: амплитуду и темп ведёт возбуждение ---
+  const root = rootRef.value
+  if (root) {
+    const pace = 0.7 + arousal * 1.7
+    root.position.y = Math.sin(elapsed * pace) * (0.035 + arousal * 0.045) * sleepy
+    // Покачивание, а не вращение: существо не крутится вокруг оси.
+    root.rotation.y = Math.sin(elapsed * 0.45) * 0.22 * sleepy
+    root.rotation.x = Math.sin(elapsed * 0.33) * 0.09 * sleepy
+
+    // Дрожь только на пике — иначе это просто шум.
+    if (arousal > 0.82 && !props.asleep) {
+      const j = (arousal - 0.82) * 0.09
+      root.position.x = (Math.random() - 0.5) * j
+      root.position.z = (Math.random() - 0.5) * j
+    }
+    else {
+      root.position.x = 0
+      root.position.z = 0
+    }
+  }
+
+  if (orbitsRef.value) {
+    orbitsRef.value.children.forEach((ring: any, i: number) => {
+      const dir = i % 2 === 0 ? 1 : -1
+      const speed = (0.08 + arousal * 0.5) * (i + 1) * 0.5 * sleepy
+      ring.rotation.z += delta * speed * dir
+      ring.rotation.x += delta * speed * 0.6
+    })
+  }
 })
 </script>
 
 <template>
-  <TresMesh ref="bodyRef">
-    <TresIcosahedronGeometry :args="[1, 0]" />
-    <TresMeshStandardMaterial :roughness="0.45" :metalness="0.25" :flat-shading="true" />
-  </TresMesh>
+  <TresGroup ref="rootRef">
+    <!-- Тело. Гранёное: чёткие рёбра вместо мягкой подсветки (ADR-0003). -->
+    <TresMesh ref="bodyRef">
+      <TresIcosahedronGeometry :args="[1, 1]" />
+      <TresMeshStandardMaterial :roughness="0.55" :metalness="0.12" :flat-shading="true" />
+    </TresMesh>
+
+    <!-- Глаз -->
+    <TresGroup :position="[0, 0.06, EYE_Z]">
+      <TresMesh>
+        <TresSphereGeometry :args="[EYE_R, 40, 28]" />
+        <TresMeshStandardMaterial :color="theme.creature.sclera" :roughness="0.35" />
+      </TresMesh>
+
+      <!--
+        Зрачок сидит на поверхности склеры и слегка выступает за неё.
+        Утопленный внутрь сферы он полностью пропадает, и глаз читается
+        визором, а не глазом.
+      -->
+      <TresMesh ref="irisRef" :position="[0, 0, EYE_R * 0.97]">
+        <TresSphereGeometry :args="[0.3, 28, 20]" />
+        <TresMeshStandardMaterial :color="theme.creature.iris" :roughness="0.25" />
+      </TresMesh>
+
+      <!-- Блик: крошечный, но именно он делает глаз живым, а не нарисованным. -->
+      <TresMesh :position="[-0.11, 0.12, EYE_R * 1.15]">
+        <TresSphereGeometry :args="[0.06, 12, 10]" />
+        <TresMeshBasicMaterial :color="theme.creature.highlight" />
+      </TresMesh>
+
+      <!--
+        Веки — сферические чаши чуть большего радиуса, концентричные глазу.
+        При нулевом повороте их кромки сходятся по экватору: глаз закрыт.
+        Поворот по X отводит кромку и раскрывает.
+      -->
+      <TresMesh ref="upperLidRef">
+        <TresSphereGeometry :args="[LID_R, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2]" />
+        <TresMeshStandardMaterial :roughness="0.55" :metalness="0.12" :side="2" />
+      </TresMesh>
+      <TresMesh ref="lowerLidRef">
+        <TresSphereGeometry :args="[LID_R, 40, 20, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]" />
+        <TresMeshStandardMaterial :roughness="0.55" :metalness="0.12" :side="2" />
+      </TresMesh>
+    </TresGroup>
+
+    <!-- Орбиты. Непрозрачные: в прототипе шли на opacity 0.8 — теперь нельзя. -->
+    <TresGroup ref="orbitsRef">
+      <TresMesh v-for="(ring, i) in orbits" :key="i" :rotation="ring.rotation">
+        <TresTorusGeometry :args="[ring.radius, 0.034, 10, 84]" />
+        <TresMeshStandardMaterial :roughness="0.5" :metalness="0.3" />
+      </TresMesh>
+    </TresGroup>
+  </TresGroup>
 </template>
