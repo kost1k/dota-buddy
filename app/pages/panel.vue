@@ -3,6 +3,7 @@ import type { AffectState } from '#shared/affect'
 import type { EscalationTier } from '#shared/escalation'
 import { AFFECT_PRESETS, AFFECT_RANGE, NEUTRAL_AFFECT } from '#shared/affect'
 import { ESCALATION_TIERS } from '#shared/escalation'
+import { VISUALS } from '#shared/visual'
 
 /**
  * Пульт разработки. Отдельная страница: в оверлей он попасть не должен
@@ -17,6 +18,9 @@ import { ESCALATION_TIERS } from '#shared/escalation'
 useHead({ title: 'Dota Buddy — пульт' })
 
 const { state, target, setTarget, setState } = useAffect()
+const { visualId, setVisual } = useVisual()
+
+useAffectTicker()
 
 /** Когда включено, ползунки пишут состояние напрямую — инерции не видно. */
 const driveDirectly = ref(false)
@@ -103,6 +107,28 @@ const fmt = (n: number) => n.toFixed(3)
           <input v-model="previewAsleep" type="checkbox">
           Предпросмотр сна
         </label>
+
+        <!--
+          Визуалы различаются ТОЛЬКО тем, чем несут валентность: возбуждение
+          у всех идёт ускорением и дыханием, это единственное отображение
+          «движение → аффект» с сильным эффектом. Поэтому подпись под
+          переключателем называет именно носителя.
+        -->
+        <div class="visuals">
+          <button
+            v-for="(meta, id) in VISUALS"
+            :key="id"
+            type="button"
+            :class="{ active: visualId === id }"
+            @click="setVisual(id)"
+          >
+            {{ meta.label }}
+          </button>
+        </div>
+        <p class="carrier">
+          <b>валентность:</b> {{ VISUALS[visualId].valenceCarrier }}<br>
+          <span class="hint">{{ VISUALS[visualId].evidence }}</span>
+        </p>
       </section>
 
       <section class="controls">
@@ -258,6 +284,31 @@ const fmt = (n: number) => n.toFixed(3)
   border: var(--db-edge-width) solid #21303a;
   border-radius: var(--db-edge-radius);
   background: #070b0e;
+}
+
+.visuals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: var(--db-scene-size);
+}
+
+.visuals button.active {
+  border-color: var(--db-valence-high);
+  background: #1d2a33;
+}
+
+.carrier {
+  margin: 2px 0 0;
+  max-width: var(--db-scene-size);
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--db-ink-muted);
+}
+
+.carrier b {
+  color: var(--db-ink);
+  font-weight: 600;
 }
 
 .controls {

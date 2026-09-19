@@ -50,6 +50,8 @@
       пульт, уровень аффекта
 - [x] [04](../.scratch/buddy-redesign/issues/04-buddy-eye-two-axes.md) —
       бадди с глазом на двух осях
+- [x] Пять визуалов с переключением, контракт визуала, палитра по замеру
+      фона игры
 - [ ] [05](../.scratch/buddy-redesign/issues/05-affect-readability-check.md) —
       проверка читаемости на людях
 
