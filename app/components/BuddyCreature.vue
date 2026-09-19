@@ -33,7 +33,14 @@ const irisRef = shallowRef()
 
 const EYE_Z = 0.55
 const EYE_R = 0.58
-const LID_R = 0.62
+/**
+ * Веки заметно крупнее глазного яблока — так и должно быть: зрачок обязан
+ * выступать за склеру, иначе тонет в ней и не виден, и при этом оставаться
+ * внутри радиуса век, иначе они проходят сквозь него и моргание его не
+ * закрывает. При LID_R = 0.62 просвет между этими условиями был 0.04 и
+ * второе не выполнялось.
+ */
+const LID_R = 0.7
 
 // Две, а не пять: на эфирном размере тонкие кольца читаются царапинами.
 const orbits = [
@@ -113,7 +120,7 @@ onBeforeRender(({ delta, elapsed }) => {
   // --- зрачок: сужается при напряжении ---
   if (irisRef.value) {
     const s = 1 - Math.max(0, -valence) * 0.22 + arousal * 0.08
-    irisRef.value.scale.set(s, s, 0.34)
+    irisRef.value.scale.set(s, s, 0.3)
   }
 
   // --- движение: амплитуду и темп ведёт возбуждение ---
@@ -168,14 +175,14 @@ onBeforeRender(({ delta, elapsed }) => {
         Утопленный внутрь сферы он полностью пропадает, и глаз читается
         визором, а не глазом.
       -->
-      <TresMesh ref="irisRef" :position="[0, 0, EYE_R * 0.97]">
+      <TresMesh ref="irisRef" :position="[0, 0, 0.56]">
         <TresSphereGeometry :args="[0.3, 28, 20]" />
         <TresMeshStandardMaterial :color="theme.creature.iris" :roughness="0.25" />
       </TresMesh>
 
       <!-- Блик: крошечный, но именно он делает глаз живым, а не нарисованным. -->
-      <TresMesh :position="[-0.11, 0.12, EYE_R * 1.15]">
-        <TresSphereGeometry :args="[0.06, 12, 10]" />
+      <TresMesh :position="[-0.133, 0.143, 0.523]">
+        <TresSphereGeometry :args="[0.05, 12, 10]" />
         <TresMeshBasicMaterial :color="theme.creature.highlight" />
       </TresMesh>
 
