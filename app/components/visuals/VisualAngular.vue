@@ -70,7 +70,9 @@ onBeforeRender(({ elapsed }) => {
     attr.array[i * 3 + 2] = base[i * 3 + 2] * k
   }
   attr.needsUpdate = true
-  mesh.geometry.computeVertexNormals()
+  // Нормали НЕ пересчитываем: при `flat-shading` three выводит их в
+  // фрагментном шейдере из производных и атрибут игнорирует целиком.
+  // Замер: ~0.023 мс на кадр чистой траты.
 
   const root = rootRef.value
   if (root)
