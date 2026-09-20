@@ -1,6 +1,6 @@
 # 02. Каркас нового клиента
 
-Status: ready-for-agent
+Status: done
 Type: task
 
 ## Зачем

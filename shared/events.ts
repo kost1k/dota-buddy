@@ -53,6 +53,10 @@ export const EVENT_KINDS: EventKind[] = [
   { id: 'buyback', label: 'Байбек', tier: 'mid', amplitude: 0.6, direction: { valence: -0.3, arousal: 0.9 } },
   { id: 'aghanims', label: 'Аганим', tier: 'mid', amplitude: 0.7, direction: { valence: 0.8, arousal: 0.4 }, oneShot: true, milestone: 'aghanim' },
   { id: 'shard', label: 'Шард', tier: 'mid', amplitude: 0.55, direction: { valence: 0.7, arousal: 0.35 }, oneShot: true, milestone: 'shard' },
+  // Ниже — два типа, которые НИЧЕМ не порождаются: диффинг своего героя их
+  // не выводит, пульт их не шлёт. Рампейдж и аегис приходят блоком `events`,
+  // а его потребителя ещё нет (см. `derive.ts`). Каталог их держит заранее
+  // намеренно: оба верхнего уровня, и без них эскалация не с чем сравнивать.
   { id: 'rampage', label: 'Рампейдж', tier: 'fullscreen', amplitude: 1, direction: { valence: 1, arousal: 1 } },
   { id: 'aegis', label: 'Аегис', tier: 'fullscreen', amplitude: 0.9, direction: { valence: 0.9, arousal: 0.8 } },
 ]
