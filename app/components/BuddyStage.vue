@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { VisualId, VisualProps } from '#shared/visual'
-import VisualBreath from './visuals/VisualBreath.vue'
 import VisualCrystal from './visuals/VisualCrystal.vue'
 import VisualEye from './visuals/VisualEye.vue'
 import VisualMetaballs from './visuals/VisualMetaballs.vue'
@@ -30,7 +29,6 @@ const REGISTRY: Record<VisualId, Component> = {
   torus: VisualTorus,
   metaballs: VisualMetaballs,
   crystal: VisualCrystal,
-  breath: VisualBreath,
 }
 
 const { visualId } = useVisual()

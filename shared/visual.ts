@@ -95,14 +95,14 @@ export const VISUALS: Record<VisualId, VisualMeta> = {
     form: 'выпуклая оболочка, плоские грани',
     valenceCarrier: 'радиусы вершин: собранность ↔ осколок',
   },
-  breath: {
-    label: 'Дыхание',
-    form: 'капля вращения со скруткой, форма не меняется',
-    valenceCarrier: 'только светлота',
-  },
 }
 
-export const DEFAULT_VISUAL: VisualId = 'eye'
+/**
+ * Основной визуал. По решению о ярусах поддержки (спека, §2.6) именно он
+ * получает эскалацию, вехи и всё последующее; остальные подтягиваются,
+ * только когда данные покажут, что они того стоят.
+ */
+export const DEFAULT_VISUAL: VisualId = 'torus'
 
 export function isVisualId(value: unknown): value is VisualId {
   return typeof value === 'string' && value in VISUALS
