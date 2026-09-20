@@ -17,6 +17,7 @@
 
 import type { AffectState } from './affect'
 import type { BuddyEvent } from './events'
+import type { Milestones } from './milestones'
 
 export interface VisualProps {
   /** −1..1, медленная ось. Состояние, без импульса. */
@@ -36,8 +37,12 @@ export interface VisualProps {
    * использовать отдельно — например, чтобы выбрать профиль движения.
    */
   impulse: AffectState
-  /** Счётчик необратимых достижений матча. Рубеж 3. */
-  milestones: number
+  /**
+   * Необратимые достижения матча. Не число, а структура: таланты
+   * однородны и считаются, аганим и шард единичны и получают собственные
+   * элементы.
+   */
+  milestones: Milestones
   /**
    * Последнее сработавшее событие. Меняет `id` при каждом срабатывании —
    * по этому визуал и понимает, что пора выбрать новый профиль движения.

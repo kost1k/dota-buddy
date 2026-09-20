@@ -33,7 +33,7 @@ const REGISTRY: Record<VisualId, Component> = {
 
 const { visualId } = useVisual()
 const { state, impulse } = useAffect()
-const { lastEvent } = useReactions()
+const { lastEvent, milestones } = useReactions()
 
 const visual = computed(() => REGISTRY[visualId.value])
 
@@ -42,9 +42,7 @@ const visualProps = computed<VisualProps>(() => ({
   arousal: state.value.arousal,
   impulse: impulse.value,
   event: lastEvent.value,
-  // Вехи — рубеж 3. Поле есть в контракте уже сейчас, чтобы его появление
-  // не потребовало трогать все визуалы разом.
-  milestones: 0,
+  milestones: milestones.value,
   asleep: props.asleep,
 }))
 

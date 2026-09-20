@@ -12,6 +12,7 @@
 
 import type { AffectState } from './affect'
 import type { EscalationTier } from './escalation'
+import type { MilestoneKind } from './milestones'
 
 export interface EventKind {
   id: string
@@ -29,16 +30,28 @@ export interface EventKind {
    * вес; важен только знак и соотношение осей.
    */
   direction: AffectState
+  /**
+   * Событие случается считанные разы за матч, и свежесть на него не
+   * тратится: приглушать нечего.
+   *
+   * Флаг явный, а не выведенный из того, что событие «вроде бы не
+   * повторяется». Молчаливое совпадение сломалось бы беззвучно, стоит
+   * кому-нибудь добавить повторяющуюся веху.
+   */
+  oneShot?: boolean
+  /** Какую веху отмечает, если отмечает. */
+  milestone?: MilestoneKind
 }
 
 export const EVENT_KINDS: EventKind[] = [
   { id: 'kill', label: 'Убийство', tier: 'micro', amplitude: 0.35, direction: { valence: 0.7, arousal: 0.6 } },
-  { id: 'talent', label: 'Взят талант', tier: 'micro', amplitude: 0.2, direction: { valence: 0.5, arousal: 0.2 } },
+  { id: 'talent', label: 'Взят талант', tier: 'micro', amplitude: 0.35, direction: { valence: 0.5, arousal: 0.2 }, oneShot: true, milestone: 'talent' },
   { id: 'respawn', label: 'Респавн', tier: 'micro', amplitude: 0.25, direction: { valence: 0.4, arousal: 0.3 } },
   { id: 'death', label: 'Смерть', tier: 'mid', amplitude: 0.75, direction: { valence: -0.9, arousal: 0.7 } },
   { id: 'streak', label: 'Килстрик 3+', tier: 'mid', amplitude: 0.7, direction: { valence: 0.9, arousal: 0.8 } },
   { id: 'buyback', label: 'Байбек', tier: 'mid', amplitude: 0.6, direction: { valence: -0.3, arousal: 0.9 } },
-  { id: 'aghanims', label: 'Аганим', tier: 'mid', amplitude: 0.55, direction: { valence: 0.8, arousal: 0.4 } },
+  { id: 'aghanims', label: 'Аганим', tier: 'mid', amplitude: 0.7, direction: { valence: 0.8, arousal: 0.4 }, oneShot: true, milestone: 'aghanim' },
+  { id: 'shard', label: 'Шард', tier: 'mid', amplitude: 0.55, direction: { valence: 0.7, arousal: 0.35 }, oneShot: true, milestone: 'shard' },
   { id: 'rampage', label: 'Рампейдж', tier: 'fullscreen', amplitude: 1, direction: { valence: 1, arousal: 1 } },
   { id: 'aegis', label: 'Аегис', tier: 'fullscreen', amplitude: 0.9, direction: { valence: 0.9, arousal: 0.8 } },
 ]

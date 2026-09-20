@@ -1,6 +1,8 @@
 import type { AffectState } from '#shared/affect'
 import type { BuddyEvent } from '#shared/events'
+import type { Milestones } from '#shared/milestones'
 import { findEventKind } from '#shared/events'
+import { applyMilestone, NO_MILESTONES } from '#shared/milestones'
 import { eventWeight, recoverFreshness, spendFreshness } from '#shared/reaction'
 
 /**
@@ -30,24 +32,35 @@ export function useReactions() {
   const seenAt = useState<Record<string, number>>('reactions:seenAt', () => ({}))
   const lastEvent = useState<BuddyEvent | null>('reactions:last', () => null)
   const counter = useState<number>('reactions:counter', () => 0)
+  const milestones = useState<Milestones>('reactions:milestones', () => ({ ...NO_MILESTONES }))
 
   function fire(kindId: string, now = Date.now()): BuddyEvent | null {
     const kind = findEventKind(kindId)
     if (!kind)
       return null
 
-    const previousAt = seenAt.value[kindId]
-    const stored = freshness.value[kindId] ?? 1
-    const current = previousAt === undefined
-      ? 1
-      : recoverFreshness(stored, (now - previousAt) / 1000)
+    // Однократные события свежесть не тратят и не читают: приглушать
+    // нечего, повтора не будет. Флаг явный, а не выведенный из природы
+    // события, — иначе поведение сломается беззвучно, стоит добавить
+    // повторяющуюся веху.
+    let weight = kind.amplitude
+    if (!kind.oneShot) {
+      const previousAt = seenAt.value[kindId]
+      const stored = freshness.value[kindId] ?? 1
+      const current = previousAt === undefined
+        ? 1
+        : recoverFreshness(stored, (now - previousAt) / 1000)
 
-    // Вес считается ОДИН раз, здесь. Пересчёт при отрисовке дал бы разный
-    // результат в зависимости от того, когда на событие посмотрели.
-    const weight = eventWeight(kind.amplitude, current)
+      // Вес считается ОДИН раз, здесь. Пересчёт при отрисовке дал бы разный
+      // результат в зависимости от того, когда на событие посмотрели.
+      weight = eventWeight(kind.amplitude, current)
+      freshness.value = { ...freshness.value, [kindId]: spendFreshness(current) }
+      seenAt.value = { ...seenAt.value, [kindId]: now }
+    }
 
-    freshness.value = { ...freshness.value, [kindId]: spendFreshness(current) }
-    seenAt.value = { ...seenAt.value, [kindId]: now }
+    if (kind.milestone)
+      milestones.value = applyMilestone(milestones.value, kind.milestone)
+
     counter.value += 1
 
     const event: BuddyEvent = {
@@ -74,5 +87,5 @@ export function useReactions() {
     return event
   }
 
-  return { fire, lastEvent, freshness }
+  return { fire, lastEvent, freshness, milestones }
 }

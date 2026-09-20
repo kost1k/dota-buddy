@@ -3,6 +3,7 @@ import type { VisualProps } from '#shared/visual'
 import { useLoop } from '@tresjs/core'
 import { Color } from 'three'
 import { clampAffect } from '#shared/affect'
+import { MAX_TALENTS } from '#shared/milestones'
 import { breathHz } from '#shared/motion'
 import { bodyColor, toHex } from '#shared/palette'
 import { createShuffleBag } from '#shared/shuffle-bag'
@@ -50,6 +51,27 @@ const drawProfile = createShuffleBag<ReactionProfile>(['burst', 'wring', 'ripple
 
 let profile: ReactionProfile = 'burst'
 let seenEventId = 0
+
+/**
+ * Вехи. Обе оси аффекта возвратны — через минуту после события бадди снова
+ * примерно там же, — поэтому без накопления у матча нет видимой дуги, и
+ * зритель, зашедший на сороковой минуте, видит то же, что на пятой.
+ *
+ * Таланты идут счётчиком: они однородны, и различать, какой именно взят,
+ * не требуется. Аганим и шард получают собственные элементы — появление
+ * нового признака читается как «что-то приобретено» даже тем, кто не знает
+ * названий.
+ */
+const talentSlots = Array.from({ length: MAX_TALENTS }, (_, i) => {
+  const angle = (i / MAX_TALENTS) * Math.PI * 2 + Math.PI / MAX_TALENTS
+  // Радиус 0.99, а не 0.78: осевая линия тора проходит внутри трубки
+  // (её радиус 0.23), и бусина меньшего размера там просто тонет.
+  return [Math.cos(angle) * 0.99, Math.sin(angle) * 0.99, 0] as [number, number, number]
+})
+
+const beadsRef = shallowRef()
+const aghanimRef = shallowRef()
+const shardRef = shallowRef()
 
 const { onBeforeRender } = useLoop()
 
@@ -136,6 +158,32 @@ onBeforeRender(({ elapsed }) => {
   // Нормали пересчитываем: материал гладкий, и без этого рябь не осветится.
   mesh.geometry.computeVertexNormals()
 
+  // --- вехи ---
+  const { talents, aghanim, shard } = props.milestones
+  if (beadsRef.value) {
+    beadsRef.value.children.forEach((bead: any, i: number) => {
+      bead.visible = i < talents
+      if (bead.visible)
+        bead.material.color.copy(tint)
+    })
+  }
+  if (aghanimRef.value) {
+    aghanimRef.value.visible = aghanim
+    if (aghanim) {
+      aghanimRef.value.material.color.copy(tint)
+      aghanimRef.value.rotation.z -= 0.004 * (1 + arousal) * sleepy
+    }
+  }
+  if (shardRef.value) {
+    shardRef.value.visible = shard
+    if (shard) {
+      shardRef.value.material.color.copy(tint)
+      const orbit = elapsed * 0.6 * (1 + arousal) * sleepy
+      shardRef.value.position.set(Math.cos(orbit) * 1.45, Math.sin(orbit) * 1.45, Math.sin(orbit * 1.7) * 0.25)
+      shardRef.value.rotation.set(orbit * 1.4, orbit * 0.9, 0)
+    }
+  }
+
   const root = rootRef.value
   if (!root)
     return
@@ -158,6 +206,26 @@ onBeforeRender(({ elapsed }) => {
     <TresMesh ref="ringRef">
       <TresTorusGeometry :args="[0.78, 0.23, 24, 120]" />
       <TresMeshStandardMaterial :roughness="0.35" :metalness="0.25" />
+    </TresMesh>
+
+    <!-- Таланты: бусины по кольцу, по одной на взятый. -->
+    <TresGroup ref="beadsRef">
+      <TresMesh v-for="(slot, i) in talentSlots" :key="i" :position="slot" :visible="false">
+        <TresIcosahedronGeometry :args="[0.12, 1]" />
+        <TresMeshStandardMaterial :roughness="0.3" :metalness="0.45" :flat-shading="true" />
+      </TresMesh>
+    </TresGroup>
+
+    <!-- Аганим: второе тонкое кольцо снаружи. -->
+    <TresMesh ref="aghanimRef" :visible="false" :rotation="[0.5, 0.3, 0]">
+      <TresTorusGeometry :args="[1.22, 0.04, 12, 96]" />
+      <TresMeshStandardMaterial :roughness="0.25" :metalness="0.6" />
+    </TresMesh>
+
+    <!-- Шард: отдельный обломок на орбите. -->
+    <TresMesh ref="shardRef" :visible="false">
+      <TresOctahedronGeometry :args="[0.19, 0]" />
+      <TresMeshStandardMaterial :roughness="0.25" :metalness="0.55" :flat-shading="true" />
     </TresMesh>
   </TresGroup>
 </template>
