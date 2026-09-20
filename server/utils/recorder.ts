@@ -61,9 +61,28 @@ export function recordRawSnapshot(body: unknown): void {
     })
 }
 
-/** Инициализация из окружения. Пустое значение — запись выключена. */
+/**
+ * Инициализация из окружения. Пустое значение — запись выключена.
+ *
+ * Состояние сообщается в консоль намеренно и громко: без этого недоступный
+ * путь выключал бы запись молча, и выяснилось бы это только по возвращении
+ * с игрового ПК без файла — то есть когда переснять уже нельзя.
+ */
 export function initRecordingFromEnv(): void {
   const path = process.env.NUXT_GSI_RECORD?.trim()
-  if (path)
-    startRecording(path)
+  if (!path) {
+    console.log('[recorder] запись выключена: NUXT_GSI_RECORD не задан')
+    return
+  }
+
+  startRecording(path)
+  console.log(`[recorder] пишу сырые пакеты в ${path}`)
+
+  // Пробная запись сразу, а не на первом пакете: путь должен провериться
+  // при старте, пока человек смотрит в консоль, а не через сорок минут.
+  appendFile(path, '', 'utf8').catch((cause) => {
+    failed = true
+    console.error(`[recorder] ЗАПИСЬ НЕ РАБОТАЕТ (${path}):`, cause instanceof Error ? cause.message : cause)
+    console.error('[recorder] проверь, что директория существует')
+  })
 }
