@@ -3,6 +3,7 @@ import type { AffectState } from '#shared/affect'
 import { AFFECT_PRESETS, AFFECT_RANGE, NEUTRAL_AFFECT } from '#shared/affect'
 import { ESCALATION_TIERS } from '#shared/escalation'
 import { EVENT_KINDS } from '#shared/events'
+import { SCENARIOS } from '#shared/synthetic'
 import { VISUALS } from '#shared/visual'
 
 /**
@@ -20,6 +21,12 @@ useHead({ title: 'Dota Buddy — пульт' })
 const { state, target, setTarget, setState } = useAffect()
 const { visualId, setVisual } = useVisual()
 const { fire, freshness, milestones, level } = useReactions()
+const sender = useSnapshotSender()
+
+// Пульт слушает WebSocket наравне с оверлеем: иначе нижний уровень
+// проверял бы только путь «туда», а смысл именно в круге — пакет уходит на
+// сервер и возвращается разобранным.
+const { snapshot: received, awake } = useOverlayLink()
 
 useAffectTicker()
 
@@ -198,6 +205,46 @@ const fmt = (n: number) => n.toFixed(3)
           </div>
         </div>
 
+        <!--
+          Нижний уровень пульта: пакеты уходят на сервер тем же путём, что и
+          настоящая игра, и возвращаются событиями по WebSocket. Верхний
+          уровень (кнопки ниже) бьёт по реакциям напрямую — он быстрее для
+          итераций по визуалу, но серверную часть не проверяет вовсе.
+        -->
+        <div class="group">
+          <h2>
+            Сценарии
+            <span class="hint">снапшоты в POST /api/gsi, реальная каденция</span>
+          </h2>
+          <div class="row wrap">
+            <button
+              v-for="scenario in SCENARIOS"
+              :key="scenario.id"
+              type="button"
+              :disabled="sender.running.value !== null"
+              :class="{ active: sender.running.value === scenario.id }"
+              @click="sender.run(scenario)"
+            >
+              {{ scenario.label }}
+            </button>
+            <button type="button" @click="sender.reset()">
+              Сброс
+            </button>
+          </div>
+          <p class="last-event">
+            вернулось: {{ received ? `уровень ${received.hero.level}, ${received.hero.alive ? 'жив' : 'мёртв'}` : 'ничего' }} ·
+            связь {{ awake ? 'есть' : 'тишина' }}
+          </p>
+          <p class="last-event">
+            отправлено пакетов: {{ sender.sent.value }} ·
+            здоровье {{ Math.round(sender.snapshot.value.hero.healthFraction * 100) }}% ·
+            счёт {{ sender.snapshot.value.map.radiantScore }}:{{ sender.snapshot.value.map.direScore }}
+            <template v-if="sender.error.value">
+              <br><b>ошибка: {{ sender.error.value }}</b>
+            </template>
+          </p>
+        </div>
+
         <div class="group">
           <h2>События <span class="hint">цифра — остаток свежести, он глушит вес повторов</span></h2>
           <div class="row wrap">
@@ -373,7 +420,12 @@ button {
   cursor: pointer;
 }
 
-button:hover {
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+button:hover:not(:disabled) {
   border-color: #3f5766;
 }
 
