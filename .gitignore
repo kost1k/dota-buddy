@@ -22,3 +22,6 @@ logs
 .env
 .env.*
 !.env.example
+
+# Записи GSI-сессий: большие, локальные, в историю не нужны
+recordings

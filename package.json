@@ -11,6 +11,7 @@
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "test": "vitest run",
+    "sanitize:recording": "bun run scripts/sanitize-recording.ts",
     "test:watch": "vitest",
     "typecheck": "vue-tsc --noEmit"
   },
