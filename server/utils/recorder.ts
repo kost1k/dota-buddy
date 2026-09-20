@@ -1,5 +1,6 @@
 import { appendFile } from 'node:fs/promises'
 import process from 'node:process'
+import { stripAuth } from './sanitize'
 
 /**
  * Запись сырых GSI-пакетов в файл.
@@ -11,6 +12,11 @@ import process from 'node:process'
  * Пишется СЫРОЕ тело, до санитизации. Иначе запись отражала бы наши
  * представления о формате, а не то, что действительно присылает Dota, — и
  * ровно тот случай, когда мы ошиблись в поле, остался бы невидимым.
+ *
+ * Единственное исключение — токен: он снимается здесь же, потому что
+ * секрет, а не свидетельство о формате. Обезличивание записи (steamid,
+ * имя, идентификатор матча, чат) делается отдельным шагом после выезда,
+ * см. `sanitize.ts`.
  *
  * Формат — JSON Lines: одна строка на пакет, дописывается в конец.
  * Устойчиво к обрыву: недописанная последняя строка не портит предыдущие.
@@ -49,7 +55,10 @@ export function recordRawSnapshot(body: unknown): void {
     return
 
   const path = target
-  const line = `${JSON.stringify({ at: Date.now(), body })}\n`
+  // Единственное, что снимается НА ЗАПИСИ. Всё прочее обезличивается
+  // постфактум (`sanitize.ts`), но токен — секрет, а не свидетельство о
+  // формате: терять с ним нечего, а утечка срабатывает сразу.
+  const line = `${JSON.stringify({ at: Date.now(), body: stripAuth(body) })}\n`
 
   queue = queue
     .then(() => appendFile(path, line, 'utf8'))
