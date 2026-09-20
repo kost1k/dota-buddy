@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { AffectState } from '#shared/affect'
-import type { EscalationTier } from '#shared/escalation'
 import { AFFECT_PRESETS, AFFECT_RANGE, NEUTRAL_AFFECT } from '#shared/affect'
 import { ESCALATION_TIERS } from '#shared/escalation'
+import { EVENT_KINDS } from '#shared/events'
 import { VISUALS } from '#shared/visual'
 
 /**
@@ -19,6 +19,7 @@ useHead({ title: 'Dota Buddy — пульт' })
 
 const { state, target, setTarget, setState } = useAffect()
 const { visualId, setVisual } = useVisual()
+const { fire, freshness } = useReactions()
 
 useAffectTicker()
 
@@ -56,25 +57,10 @@ const PRESET_LABELS: Record<keyof typeof AFFECT_PRESETS, string> = {
   defeated: 'Подавленность',
 }
 
-/**
- * Заглушки. Настоящая модель событий — рубеж 2, эскалация — рубеж 3.
- * Здесь кнопки только показывают, какой уровень ответа положен событию.
- */
-const EVENT_STUBS: { id: string, label: string, tier: EscalationTier }[] = [
-  { id: 'kill', label: 'Убийство', tier: 'micro' },
-  { id: 'talent', label: 'Взят талант', tier: 'micro' },
-  { id: 'respawn', label: 'Респавн', tier: 'micro' },
-  { id: 'death', label: 'Смерть', tier: 'mid' },
-  { id: 'streak', label: 'Килстрик 3+', tier: 'mid' },
-  { id: 'buyback', label: 'Байбек', tier: 'mid' },
-  { id: 'aghanims', label: 'Аганим', tier: 'mid' },
-  { id: 'rampage', label: 'Рампейдж', tier: 'fullscreen' },
-  { id: 'aegis', label: 'Аегис', tier: 'fullscreen' },
-]
-
-function fireEvent(stub: (typeof EVENT_STUBS)[number]) {
-  lastEvent.value = `${stub.label} → ${ESCALATION_TIERS[stub.tier].label}`
-  console.log('[panel] событие-заглушка', stub)
+function fireEvent(kind: (typeof EVENT_KINDS)[number]) {
+  const event = fire(kind.id)
+  if (event)
+    lastEvent.value = `${kind.label} → ${ESCALATION_TIERS[kind.tier].label}, вес ${event.weight.toFixed(2)}`
 }
 
 /** Координаты точки на плоскости в процентах, для графика. */
@@ -213,7 +199,7 @@ const fmt = (n: number) => n.toFixed(3)
         </div>
 
         <div class="group">
-          <h2>События <span class="hint">заглушки, визуала пока нет</span></h2>
+          <h2>События <span class="hint">цифра — остаток свежести, он глушит вес повторов</span></h2>
           <div class="row wrap">
             <!--
               Подсказка уровня живёт в легенде ниже, а не в title кнопки:
@@ -221,14 +207,14 @@ const fmt = (n: number) => n.toFixed(3)
               «внутри границ виджета, постоянно» вместо названия события.
             -->
             <button
-              v-for="stub in EVENT_STUBS"
-              :key="stub.id"
+              v-for="kind in EVENT_KINDS"
+              :key="kind.id"
               type="button"
-              :class="`tier-${stub.tier}`"
-              @click="fireEvent(stub)"
+              :class="`tier-${kind.tier}`"
+              @click="fireEvent(kind)"
             >
-              {{ stub.label }}
-              <span class="tier">{{ ESCALATION_TIERS[stub.tier].label }}</span>
+              {{ kind.label }}
+              <span class="tier">{{ (freshness[kind.id] ?? 1).toFixed(2) }}</span>
             </button>
           </div>
           <dl class="legend">

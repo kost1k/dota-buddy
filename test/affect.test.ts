@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   AFFECT_RANGE,
+  clampAffect,
   DEFAULT_AFFECT_TUNING,
   MAX_STEP_SECONDS,
   NEUTRAL_AFFECT,
@@ -129,5 +130,19 @@ describe('stepAffect: диапазоны из CONTEXT.md', () => {
 
     expect(state.valence).toBeGreaterThanOrEqual(-1)
     expect(state.arousal).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('clampAffect', () => {
+  // Нужен там, где состояние складывается с импульсом: замер дал
+  // валентность −1.19 после трёх смертей подряд.
+  it('зажимает обе оси в допустимые диапазоны', () => {
+    expect(clampAffect({ valence: -1.19, arousal: 1.6 })).toEqual({ valence: -1, arousal: 1 })
+    expect(clampAffect({ valence: 2, arousal: -0.4 })).toEqual({ valence: 1, arousal: 0 })
+  })
+
+  it('не трогает точку внутри диапазонов', () => {
+    const inside = { valence: -0.3, arousal: 0.7 }
+    expect(clampAffect(inside)).toEqual(inside)
   })
 })

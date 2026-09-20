@@ -3,6 +3,7 @@ import type { VisualProps } from '#shared/visual'
 import { MarchingCube, MarchingCubes } from '@tresjs/cientos'
 import { useLoop } from '@tresjs/core'
 import { Color } from 'three'
+import { clampAffect } from '#shared/affect'
 import { breathHz } from '#shared/motion'
 import { bodyColor, toHex } from '#shared/palette'
 
@@ -39,7 +40,11 @@ const tint = new Color()
 const { onBeforeRender } = useLoop()
 
 onBeforeRender(({ elapsed }) => {
-  const { valence, arousal, asleep } = props
+  const { asleep } = props
+  const { valence, arousal } = clampAffect({
+    valence: props.valence + props.impulse.valence,
+    arousal: props.arousal + props.impulse.arousal,
+  })
   const sleepy = asleep ? 0.25 : 1
 
   tint.set(toHex(bodyColor(valence, arousal)))

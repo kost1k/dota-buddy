@@ -1,5 +1,6 @@
 import type { AffectState } from '#shared/affect'
 import { NEUTRAL_AFFECT, stepAffect } from '#shared/affect'
+import { stepImpulse } from '#shared/reaction'
 
 /**
  * Реактивная оболочка над чистым интегратором аффекта.
@@ -15,9 +16,24 @@ import { NEUTRAL_AFFECT, stepAffect } from '#shared/affect'
 export function useAffect() {
   const state = useState<AffectState>('affect:state', () => ({ ...NEUTRAL_AFFECT }))
   const target = useState<AffectState>('affect:target', () => ({ ...NEUTRAL_AFFECT }))
+  /** Быстрый слой поверх состояния; живёт отдельно — см. `#shared/reaction`. */
+  const impulse = useState<AffectState>('affect:impulse', () => ({ ...NEUTRAL_AFFECT }))
 
   function tick(deltaSeconds: number) {
     state.value = stepAffect(state.value, target.value, deltaSeconds)
+    const decayed = stepImpulse(impulse.value, deltaSeconds)
+    // Присваиваем только при изменении: погасший импульс иначе будил бы
+    // реактивность каждый кадр до конца стрима.
+    if (decayed !== impulse.value)
+      impulse.value = decayed
+  }
+
+  /** Толчок поверх состояния. Складывается с уже идущим, а не заменяет его. */
+  function addImpulse(next: AffectState) {
+    impulse.value = {
+      valence: impulse.value.valence + next.valence,
+      arousal: impulse.value.arousal + next.arousal,
+    }
   }
 
   function setTarget(next: Partial<AffectState>) {
@@ -35,5 +51,5 @@ export function useAffect() {
     state.value = { ...state.value, ...next }
   }
 
-  return { state, target, tick, setTarget, setState }
+  return { state, target, impulse, tick, setTarget, setState, addImpulse }
 }

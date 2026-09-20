@@ -25,6 +25,22 @@ export const AFFECT_RANGE = {
   arousal: [0, 1],
 } as const
 
+/**
+ * Зажим точки аффекта в допустимые диапазоны.
+ *
+ * Нужен там, где состояние складывается с импульсом: сумма легко выходит
+ * за границы — замер дал валентность −1.19 после трёх смертей подряд. Для
+ * цвета это безобидно, палитра зажимает сама, но геометрия считает от
+ * нормированной величины, и выход за диапазон ломает её пороги. У кольца,
+ * например, рябь перестаёт умещаться и затягивает отверстие.
+ */
+export function clampAffect(state: AffectState): AffectState {
+  return {
+    valence: Math.min(Math.max(state.valence, AFFECT_RANGE.valence[0]), AFFECT_RANGE.valence[1]),
+    arousal: Math.min(Math.max(state.arousal, AFFECT_RANGE.arousal[0]), AFFECT_RANGE.arousal[1]),
+  }
+}
+
 export const NEUTRAL_AFFECT: AffectState = { valence: 0, arousal: 0 }
 
 /**

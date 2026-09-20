@@ -2,8 +2,10 @@
 import type { VisualProps } from '#shared/visual'
 import { useLoop } from '@tresjs/core'
 import { Color } from 'three'
+import { clampAffect } from '#shared/affect'
 import { breathHz } from '#shared/motion'
 import { bodyColor, toHex } from '#shared/palette'
+import { createShuffleBag } from '#shared/shuffle-bag'
 
 /**
  * Визуал: кольцо.
@@ -32,17 +34,48 @@ const tint = new Color()
 let base: Float32Array | null = null
 let normals: Float32Array | null = null
 
+/**
+ * Профили реакции. Существуют потому, что повторяющийся визуал мёртв после
+ * ВТОРОГО показа: одинаковая анимация смерти за матч — это девять повторов
+ * одного стимула.
+ *
+ * Профили меняют только ФОРМУ рывка. Его величина и знак приходят из веса
+ * события, а возврат задаёт инерция — поэтому реакция остаётся узнаваемой
+ * реакцией, хотя выглядит каждый раз иначе. Постоянен уровень эскалации, а
+ * не тип события: зритель и так видит экран игры, ему нужен масштаб, а не
+ * расшифровка.
+ */
+type ReactionProfile = 'burst' | 'wring' | 'ripple' | 'squash'
+const drawProfile = createShuffleBag<ReactionProfile>(['burst', 'wring', 'ripple', 'squash'])
+
+let profile: ReactionProfile = 'burst'
+let seenEventId = 0
+
 const { onBeforeRender } = useLoop()
 
 onBeforeRender(({ elapsed }) => {
-  const { valence, arousal, asleep } = props
+  const { asleep } = props
   const sleepy = asleep ? 0.25 : 1
+  // Контракт отдаёт состояние и импульс раздельно, потому что быстрый слой
+  // живёт по своим правилам; рисуется их сумма.
+  const { valence, arousal } = clampAffect({
+    valence: props.valence + props.impulse.valence,
+    arousal: props.arousal + props.impulse.arousal,
+  })
+  const kick = Math.hypot(props.impulse.valence, props.impulse.arousal)
   const mesh = ringRef.value
   if (!mesh)
     return
 
   tint.set(toHex(bodyColor(valence, arousal)))
   mesh.material.color.copy(tint)
+
+  // Новое событие — новый профиль. Сравниваем по id, а не по ссылке:
+  // объект события переживает несколько кадров.
+  if (props.event && props.event.id !== seenEventId) {
+    seenEventId = props.event.id
+    profile = drawProfile()
+  }
 
   const attr = mesh.geometry.attributes.position
   if (!base) {
@@ -72,7 +105,28 @@ onBeforeRender(({ elapsed }) => {
       = Math.sin(x * 5.5 + slow) * Math.sin(y * 4.5 - slow * 0.8)
         + Math.sin(z * 6.5 + slow * 1.3) * 0.7
     const tremor = Math.sin(x * 17 + fast) * Math.sin(z * 15 - fast * 1.1)
-    const d = wave * swell + tremor * tremorAmp
+
+    // Профиль меняет ФОРМУ рывка, а не его силу: сила приходит весом.
+    let punch = 0
+    if (kick > 0) {
+      const angle = Math.atan2(y, x)
+      switch (profile) {
+        case 'burst':
+          punch = 1
+          break
+        case 'wring':
+          punch = Math.sin(angle * 2 + elapsed * 6)
+          break
+        case 'ripple':
+          punch = Math.sin(angle * 3 - elapsed * 9)
+          break
+        case 'squash':
+          punch = Math.cos(angle) * 1.3
+          break
+      }
+    }
+
+    const d = wave * swell + tremor * tremorAmp + punch * kick * 0.3
 
     attr.array[i * 3] = x + normals![i * 3]! * d
     attr.array[i * 3 + 1] = y + normals![i * 3 + 1]! * d
@@ -86,7 +140,7 @@ onBeforeRender(({ elapsed }) => {
   if (!root)
     return
   const breath = Math.sin(elapsed * breathHz(arousal) * Math.PI * 2)
-  const s = 1 + breath * (0.025 + arousal * 0.07) * sleepy
+  const s = 1 + breath * (0.025 + arousal * 0.07) * sleepy + kick * 0.14
   root.scale.set(s, s, s)
   // Наклон, а не вращение в плоскости: плоское кольцо анфас теряет
   // отверстие, а отверстие здесь — весь смысл формы.

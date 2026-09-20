@@ -2,6 +2,7 @@
 import type { VisualProps } from '#shared/visual'
 import { useLoop } from '@tresjs/core'
 import { Color } from 'three'
+import { clampAffect } from '#shared/affect'
 import { breathAmplitude, breathHz } from '#shared/motion'
 import { bodyColor, toHex } from '#shared/palette'
 
@@ -41,7 +42,13 @@ let blinkProgress = 1
 const { onBeforeRender } = useLoop()
 
 onBeforeRender(({ delta, elapsed }) => {
-  const { valence, arousal, asleep } = props
+  const { asleep } = props
+  // Импульс складывается с состоянием: контракт отдаёт их раздельно,
+  // потому что быстрый слой живёт по своим правилам, но рисуется сумма.
+  const { valence, arousal } = clampAffect({
+    valence: props.valence + props.impulse.valence,
+    arousal: props.arousal + props.impulse.arousal,
+  })
   const sleepy = asleep ? 0.25 : 1
 
   tint.set(toHex(bodyColor(valence, arousal)))
