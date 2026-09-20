@@ -1,4 +1,3 @@
-import type { AffectState } from '#shared/affect'
 import type { BuddyEvent } from '#shared/events'
 import { findEventKind } from '#shared/events'
 
@@ -13,14 +12,14 @@ import { findEventKind } from '#shared/events'
  * свои, и знать о них должен только визуал.
  */
 
-/** Насколько вес события сдвигает ЦЕЛЬ аффекта — медленное последствие. */
-const TARGET_SHIFT = 0.55
+/** Насколько вес события оставляет след — медленное последствие. */
+const OFFSET_SHIFT = 0.55
 
 /** Насколько вес события даёт мгновенный рывок. Сильнее сдвига намеренно. */
 const IMPULSE_SCALE = 0.9
 
 export function useReactions() {
-  const { target, setTarget, addImpulse } = useAffect()
+  const { addOffset, addImpulse } = useAffect()
   const lastEvent = useState<BuddyEvent | null>('reactions:last', () => null)
   const localCounter = useState<number>('reactions:localCounter', () => 0)
 
@@ -28,14 +27,14 @@ export function useReactions() {
   function apply(event: BuddyEvent) {
     lastEvent.value = event
 
-    // Два механизма, разделённые по времени. Одним не выйдет: цель ведёт
-    // медленная ось с постоянной в двенадцать секунд, а рывок обязан
-    // уложиться в доли секунды.
-    const shift: AffectState = {
-      valence: target.value.valence + event.direction.valence * event.weight * TARGET_SHIFT,
-      arousal: target.value.arousal + event.direction.arousal * event.weight * TARGET_SHIFT,
-    }
-    setTarget(shift)
+    // Событие пишет СЛЕД, а не цель. Цель складывается из следа и
+    // объективной основы из снапшота; писать в неё напрямую значило бы
+    // затереться следующим же обновлением, а для смерти ещё и посчитать
+    // её дважды — она и сама роняет счёт команд.
+    addOffset({
+      valence: event.direction.valence * event.weight * OFFSET_SHIFT,
+      arousal: event.direction.arousal * event.weight * OFFSET_SHIFT,
+    })
     addImpulse({
       valence: event.direction.valence * event.weight * IMPULSE_SCALE,
       arousal: event.direction.arousal * event.weight * IMPULSE_SCALE,

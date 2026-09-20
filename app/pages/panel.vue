@@ -18,7 +18,7 @@ import { VISUALS } from '#shared/visual'
 
 useHead({ title: 'Dota Buddy — пульт' })
 
-const { state, target, setTarget, setState } = useAffect()
+const { state, target, setBase, setState } = useAffect()
 const { visualId, setVisual } = useVisual()
 const { fire } = useReactions()
 const sender = useSnapshotSender()
@@ -37,15 +37,15 @@ const lastEventLabel = ref<string | null>(null)
 
 function drive(axis: keyof AffectState, raw: string | number) {
   const value = Number(raw)
-  setTarget({ [axis]: value })
+  setBase({ [axis]: value })
 
   if (driveDirectly.value)
     setState({ [axis]: value })
 }
 
-/** Отпустить: цель в нейтраль, бадди возвращается сам — видно инерцию. */
+/** Отпустить: основа в нейтраль, бадди возвращается сам — видно инерцию. */
 function release() {
-  setTarget(NEUTRAL_AFFECT)
+  setBase(NEUTRAL_AFFECT)
 }
 
 /**
@@ -53,7 +53,7 @@ function release() {
  * между итерациями визуала, а не в наблюдении за переходом.
  */
 function applyPreset(point: AffectState) {
-  setTarget(point)
+  setBase(point)
   setState(point)
 }
 
