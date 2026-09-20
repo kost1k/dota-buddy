@@ -53,14 +53,14 @@ onBeforeRender(({ elapsed }) => {
 
   // Пересобираем оболочку только при заметном изменении формы: замер
   // показал 0.027-0.039 мс на пересборку, но каждый кадр — это уже не шум.
-  const shards = Math.round((1 - (valence + 1) / 2) * 40)
+  const shards = Math.round((1 - (valence + 1) / 2) * 48)
   if (shards !== lastShards) {
     lastShards = shards
-    const spike = shards / 40
+    const spike = shards / 48
     // Разброс радиусов намеренно широкий: при малом контраст между
     // полюсами теряется и оба конца шкалы читаются одинаковым камнем.
     const points = directions.map((d, i) =>
-      d.clone().multiplyScalar(0.58 + spike * jitter[i]! * 0.6),
+      d.clone().multiplyScalar(0.5 + spike * jitter[i]! * 0.95),
     )
     mesh.geometry.dispose()
     mesh.geometry = new ConvexGeometry(points)

@@ -82,8 +82,8 @@ export const VISUALS: Record<VisualId, VisualMeta> = {
   },
   torus: {
     label: 'Кольцо',
-    form: 'тороидальный узел, дыра в силуэте',
-    valenceCarrier: 'толщина и собранность',
+    form: 'тор, дыра в силуэте',
+    valenceCarrier: 'рябь поверхности; возбуждение добавляет дрожь',
   },
   metaballs: {
     label: 'Метасферы',
@@ -97,7 +97,7 @@ export const VISUALS: Record<VisualId, VisualMeta> = {
   },
   breath: {
     label: 'Дыхание',
-    form: 'простое тело без черт',
+    form: 'капля вращения со скруткой, форма не меняется',
     valenceCarrier: 'только светлота',
   },
 }
