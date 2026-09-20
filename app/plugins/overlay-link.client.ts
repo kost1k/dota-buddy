@@ -18,9 +18,19 @@ import { parseOverlayMessage } from '#shared/overlay-message'
  */
 export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig()
-  const { snapshot, lastMessageAt } = useLinkState()
+  const { snapshot, lastMessageAt, now } = useLinkState()
   const { setBase } = useAffect()
   const { apply } = useReactions()
+
+  // Секундный таймер, а не rAF: сон наступает по тишине, точность до кадра
+  // здесь не нужна, а лишний кадровый таймер — нужен ещё меньше.
+  //
+  // Раньше здесь стоял `useTimestamp({ interval: 1000 })`, и он делал ровно
+  // обратное обещанному: в VueUse 15 опции `interval` нет, а планировщик по
+  // умолчанию — `useRafFn`. Опция игнорировалась молча.
+  useIntervalFn(() => {
+    now.value = Date.now()
+  }, 1000)
 
   const { data } = useWebSocket(config.public.wsUrl, { autoReconnect: true })
 

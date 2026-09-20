@@ -15,6 +15,8 @@ export function useLinkState() {
   return {
     snapshot: useState<MatchSnapshot | null>('link:snapshot', () => null),
     lastMessageAt: useState<number | null>('link:lastMessageAt', () => null),
+    /** Часы живости. Тикают раз в секунду, тоже из плагина. */
+    now: useState<number>('link:now', () => Date.now()),
   }
 }
 
@@ -34,11 +36,7 @@ export function useOverlayLink() {
   const config = useRuntimeConfig()
   const idleTimeoutMs = Number(config.public.idleTimeoutMs) || 15_000
 
-  const { snapshot, lastMessageAt } = useLinkState()
-
-  // Секундный таймер, а не rAF: сон наступает по тишине, и точность до
-  // кадра здесь не нужна, а лишний кадровый таймер — нужен ещё меньше.
-  const now = useTimestamp({ interval: 1000 })
+  const { snapshot, lastMessageAt, now } = useLinkState()
   const awake = computed(() => isAwake(lastMessageAt.value, now.value, idleTimeoutMs))
 
   return { snapshot, awake }
