@@ -2,7 +2,7 @@ import type { AffectState } from '#shared/affect'
 import type { BuddyEvent } from '#shared/events'
 import type { Milestones } from '#shared/milestones'
 import { findEventKind } from '#shared/events'
-import { applyMilestone, NO_MILESTONES } from '#shared/milestones'
+import { applyMilestone, MAX_LEVEL, NO_MILESTONES } from '#shared/milestones'
 import { eventWeight, recoverFreshness, spendFreshness } from '#shared/reaction'
 
 /**
@@ -33,6 +33,8 @@ export function useReactions() {
   const lastEvent = useState<BuddyEvent | null>('reactions:last', () => null)
   const counter = useState<number>('reactions:counter', () => 0)
   const milestones = useState<Milestones>('reactions:milestones', () => ({ ...NO_MILESTONES }))
+  /** Уровень героя. На рубеже 2 придёт из снапшота; пока растёт по кнопке. */
+  const level = useState<number>('reactions:level', () => 1)
 
   function fire(kindId: string, now = Date.now()): BuddyEvent | null {
     const kind = findEventKind(kindId)
@@ -61,6 +63,9 @@ export function useReactions() {
     if (kind.milestone)
       milestones.value = applyMilestone(milestones.value, kind.milestone)
 
+    if (kindId === 'levelUp' || kindId === 'levelLandmark')
+      level.value = Math.min(level.value + 1, MAX_LEVEL)
+
     counter.value += 1
 
     const event: BuddyEvent = {
@@ -87,5 +92,5 @@ export function useReactions() {
     return event
   }
 
-  return { fire, lastEvent, freshness, milestones }
+  return { fire, lastEvent, freshness, milestones, level }
 }

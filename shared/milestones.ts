@@ -11,41 +11,53 @@
  * накопления сорокаминутный матч не имеет видимой дуги, и зритель, зашедший
  * на сороковой минуте, видит то же, что на пятой.
  *
- * Таланты считаются числом, аганим и шард — отдельными признаками. Таланты
- * берутся четырежды и однородны: счётчик читается как «он вырос» и не
- * требует различать, какой именно взят. Аганим и шард единичны и именованы,
- * и отдельный элемент ничего не стоит незнающему зрителю — появление нового
- * признака читается как «что-то приобретено» независимо от того, понимаешь
- * ли ты название.
+ * Вех ровно две: аганим и шард. Таланты сюда не входят намеренно — взятие
+ * таланта не событие в игре, а у части героев их больше четырёх, так что
+ * счётчик на фиксированное число слотов был бы зашитым допущением,
+ * ломающимся на конкретном герое.
+ *
+ * Долгую дугу матча вместо талантов держит УРОВЕНЬ — непрерывной
+ * подложкой, без дискретных отметок.
  */
 
 export interface Milestones {
-  /** Взятые таланты, 0..4. */
-  talents: number
   aghanim: boolean
   shard: boolean
 }
 
-export type MilestoneKind = 'talent' | 'aghanim' | 'shard'
+export type MilestoneKind = 'aghanim' | 'shard'
 
-export const MAX_TALENTS = 4
-
-export const NO_MILESTONES: Milestones = { talents: 0, aghanim: false, shard: false }
+export const NO_MILESTONES: Milestones = { aghanim: false, shard: false }
 
 /** Общая достроенность, 0..1 — для непрерывных эффектов. */
-export function milestoneProgress({ talents, aghanim, shard }: Milestones): number {
-  const parts = Math.min(talents, MAX_TALENTS) / MAX_TALENTS + (aghanim ? 1 : 0) + (shard ? 1 : 0)
-  return parts / 3
+export function milestoneProgress({ aghanim, shard }: Milestones): number {
+  return ((aghanim ? 1 : 0) + (shard ? 1 : 0)) / 2
 }
 
 /** Применение вехи. Возвращает новый объект; повторное применение безвредно. */
 export function applyMilestone(current: Milestones, kind: MilestoneKind): Milestones {
-  switch (kind) {
-    case 'talent':
-      return { ...current, talents: Math.min(current.talents + 1, MAX_TALENTS) }
-    case 'aghanim':
-      return { ...current, aghanim: true }
-    case 'shard':
-      return { ...current, shard: true }
-  }
+  return kind === 'aghanim'
+    ? { ...current, aghanim: true }
+    : { ...current, shard: true }
+}
+
+/**
+ * Максимальный уровень героя в Dota 2. Нужен только для нормировки
+ * непрерывной подложки — сам по себе уровень ничего не отмечает.
+ */
+export const MAX_LEVEL = 30
+
+/**
+ * Рубежи, на которых поднятие уровня отзывается сильнее.
+ *
+ * Круглые, а не привязанные к талантам или ультимейту: число талантов у
+ * части героев отличается от четырёх, а уровни прокачки ультимейта у
+ * небольшого числа героев свои. Зашивать такие допущения — значит
+ * обзавестись поведением, которое сломается на конкретном герое и никто не
+ * поймёт почему.
+ */
+export const LEVEL_LANDMARKS = [10, 20, 30]
+
+export function isLevelLandmark(level: number): boolean {
+  return LEVEL_LANDMARKS.includes(level)
 }

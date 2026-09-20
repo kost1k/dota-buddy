@@ -19,7 +19,7 @@ useHead({ title: 'Dota Buddy — пульт' })
 
 const { state, target, setTarget, setState } = useAffect()
 const { visualId, setVisual } = useVisual()
-const { fire, freshness, milestones } = useReactions()
+const { fire, freshness, milestones, level } = useReactions()
 
 useAffectTicker()
 
@@ -227,7 +227,7 @@ const fmt = (n: number) => n.toFixed(3)
             {{ lastEvent ?? 'событий не было' }}
           </p>
           <p class="last-event">
-            вехи: таланты {{ milestones.talents }}/4 ·
+            уровень {{ level }} ·
             аганим {{ milestones.aghanim ? 'есть' : 'нет' }} ·
             шард {{ milestones.shard ? 'есть' : 'нет' }}
           </p>

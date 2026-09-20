@@ -45,7 +45,8 @@ export interface EventKind {
 
 export const EVENT_KINDS: EventKind[] = [
   { id: 'kill', label: 'Убийство', tier: 'micro', amplitude: 0.35, direction: { valence: 0.7, arousal: 0.6 } },
-  { id: 'talent', label: 'Взят талант', tier: 'micro', amplitude: 0.35, direction: { valence: 0.5, arousal: 0.2 }, oneShot: true, milestone: 'talent' },
+  { id: 'levelUp', label: 'Новый уровень', tier: 'micro', amplitude: 0.3, direction: { valence: 0.5, arousal: 0.25 } },
+  { id: 'levelLandmark', label: 'Круглый уровень', tier: 'mid', amplitude: 0.5, direction: { valence: 0.6, arousal: 0.4 } },
   { id: 'respawn', label: 'Респавн', tier: 'micro', amplitude: 0.25, direction: { valence: 0.4, arousal: 0.3 } },
   { id: 'death', label: 'Смерть', tier: 'mid', amplitude: 0.75, direction: { valence: -0.9, arousal: 0.7 } },
   { id: 'streak', label: 'Килстрик 3+', tier: 'mid', amplitude: 0.7, direction: { valence: 0.9, arousal: 0.8 } },

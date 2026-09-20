@@ -33,7 +33,7 @@ const REGISTRY: Record<VisualId, Component> = {
 
 const { visualId } = useVisual()
 const { state, impulse } = useAffect()
-const { lastEvent, milestones } = useReactions()
+const { lastEvent, milestones, level } = useReactions()
 
 const visual = computed(() => REGISTRY[visualId.value])
 
@@ -43,6 +43,7 @@ const visualProps = computed<VisualProps>(() => ({
   impulse: impulse.value,
   event: lastEvent.value,
   milestones: milestones.value,
+  level: level.value,
   asleep: props.asleep,
 }))
 

@@ -1,17 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { EVENT_KINDS } from '../shared/events'
-import { applyMilestone, MAX_TALENTS, milestoneProgress, NO_MILESTONES } from '../shared/milestones'
+import { applyMilestone, isLevelLandmark, LEVEL_LANDMARKS, MAX_LEVEL, milestoneProgress, NO_MILESTONES } from '../shared/milestones'
 
 describe('вехи', () => {
-  it('таланты копятся до потолка и дальше не растут', () => {
-    let m = NO_MILESTONES
-    for (let i = 0; i < MAX_TALENTS + 3; i++)
-      m = applyMilestone(m, 'talent')
-
-    expect(m.talents).toBe(MAX_TALENTS)
-  })
-
-  it('повторное применение единичной вехи безвредно', () => {
+  it('повторное применение безвредно', () => {
     const once = applyMilestone(NO_MILESTONES, 'aghanim')
     expect(applyMilestone(once, 'aghanim')).toEqual(once)
   })
@@ -24,17 +16,39 @@ describe('вехи', () => {
 
   it('достроенность идёт от нуля к единице', () => {
     expect(milestoneProgress(NO_MILESTONES)).toBe(0)
-    expect(milestoneProgress({ talents: MAX_TALENTS, aghanim: true, shard: true })).toBeCloseTo(1, 9)
+    expect(milestoneProgress({ aghanim: true, shard: true })).toBeCloseTo(1, 9)
   })
 
   it('достроенность монотонна', () => {
     let m = NO_MILESTONES
     let previous = -1
-    for (const kind of ['talent', 'talent', 'aghanim', 'talent', 'shard', 'talent'] as const) {
+    for (const kind of ['aghanim', 'shard'] as const) {
       m = applyMilestone(m, kind)
       const value = milestoneProgress(m)
       expect(value).toBeGreaterThan(previous)
       previous = value
+    }
+  })
+})
+
+describe('рубежи уровня', () => {
+  // Рубежи круглые, а не привязанные к талантам или ультимейту: у части
+  // героев талантов больше четырёх, а уровни ультимейта у некоторых свои.
+  // Зашитое допущение сломалось бы на конкретном герое молча.
+  it('распознаёт заявленные рубежи', () => {
+    for (const level of LEVEL_LANDMARKS)
+      expect(isLevelLandmark(level)).toBe(true)
+  })
+
+  it('не срабатывает на прочих уровнях', () => {
+    for (const level of [1, 6, 9, 11, 15, 25, 29])
+      expect(isLevelLandmark(level), `уровень ${level}`).toBe(false)
+  })
+
+  it('все рубежи лежат в пределах максимального уровня', () => {
+    for (const level of LEVEL_LANDMARKS) {
+      expect(level).toBeGreaterThan(0)
+      expect(level).toBeLessThanOrEqual(MAX_LEVEL)
     }
   })
 })
