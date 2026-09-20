@@ -1,4 +1,4 @@
-import { readSnapshot } from '#shared/snapshot'
+import { ingestRawBody } from '../utils/ingest'
 import { createLogger } from '../utils/logger'
 import { initRecordingFromEnv, recordRawSnapshot } from '../utils/recorder'
 
@@ -47,30 +47,20 @@ export default defineEventHandler(async (event) => {
   // рекордер снимает сам; проверка секрета выше уже прошла.
   recordRawSnapshot(body)
 
-  // Dota шлёт пустой объект при окончании матча или сессии. Это не ошибка,
-  // а переход в сон — и заодно граница, после которой состояние матча
-  // больше не имеет смысла.
-  const snapshot = readSnapshot(body)
-  if (!snapshot) {
-    matchState.reset()
+  // Разбор, вывод событий и рассылка — общие для всех источников пакетов
+  // (`ingest.ts`). Эндпойнту остаётся то, что есть только у него: секрет,
+  // запись сырого тела и логи с адресом отправителя.
+  const result = ingestRawBody(body)
+  if (result.mode === 'idle') {
     logger.info('[gsi] idle', { sourceIp, peers: wsService.count() })
-    wsService.broadcast({ type: 'idle' })
     return { status: 'ok', mode: 'idle' }
   }
 
-  const events = matchState.ingest(snapshot)
-
-  // Состояние идёт первым: событие описывает ИЗМЕНЕНИЕ, и клиент должен
-  // увидеть новое положение прежде, чем ему скажут, что произошло.
-  wsService.broadcast({ type: 'state', snapshot })
-  for (const derived of events)
-    wsService.broadcast({ type: 'event', event: derived })
-
-  if (events.length > 0) {
+  if (result.events.length > 0) {
     logger.debug('[gsi] events', {
       sourceIp,
       peers: wsService.count(),
-      events: events.map(e => `${e.kindId}:${e.weight.toFixed(2)}`),
+      events: result.events.map(e => `${e.kindId}:${e.weight.toFixed(2)}`),
     })
   }
 

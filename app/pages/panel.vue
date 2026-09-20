@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { AffectState } from '#shared/affect'
+import type { ReplayMode } from '#shared/replay'
 import { AFFECT_PRESETS, AFFECT_RANGE, NEUTRAL_AFFECT } from '#shared/affect'
 import { ESCALATION_TIERS } from '#shared/escalation'
 import { EVENT_KINDS } from '#shared/events'
+import { REPLAY_SPEEDS } from '#shared/replay'
 import { SCENARIOS } from '#shared/synthetic'
 import { VISUALS } from '#shared/visual'
 
@@ -22,6 +24,19 @@ const { state, target, setBase, setState } = useAffect()
 const { visualId, setVisual } = useVisual()
 const { fire } = useReactions()
 const sender = useSnapshotSender()
+const replay = useReplay()
+
+const replayFiles = computed(() => replay.state.value?.files ?? [])
+const replayTotal = computed(() => replay.state.value?.total ?? 0)
+const replayIndex = computed(() => replay.state.value?.index ?? 0)
+const replayLoaded = computed(() => replayTotal.value > 0)
+const replayPlaying = computed(() => replay.state.value?.mode === 'playing')
+
+const REPLAY_MODE_LABELS: Record<ReplayMode, string> = {
+  idle: 'стоит',
+  playing: 'играет',
+  paused: 'пауза',
+}
 
 // Пульт слушает WebSocket наравне с оверлеем: иначе нижний уровень
 // проверял бы только путь «туда», а смысл именно в круге — пакет уходит на
@@ -243,6 +258,93 @@ const fmt = (n: number) => n.toFixed(3)
               <br><b>ошибка: {{ sender.error.value }}</b>
             </template>
           </p>
+        </div>
+
+        <!--
+          Второй источник пакетов рядом со сценариями, и разница между ними
+          принципиальна: сценарии собраны нами из тех же представлений, по
+          которым написан разбор, а запись — то, что действительно прислала
+          Dota. Темп отсчитывает сервер: в неактивной вкладке браузерные
+          таймеры душатся до одного срабатывания в минуту, а пульт почти
+          всегда не в фокусе.
+        -->
+        <div class="group">
+          <h2>
+            Воспроизведение
+            <span class="hint">запись с игрового ПК, её собственные паузы</span>
+          </h2>
+
+          <div v-if="replayFiles.length === 0" class="last-event">
+            записей нет — положи <code>.jsonl</code> в каталог
+            <code>recordings/</code> и обнови
+          </div>
+
+          <template v-else>
+            <div class="row wrap">
+              <select
+                :value="replay.state.value?.file ?? ''"
+                @change="replay.load(($event.target as HTMLSelectElement).value)"
+              >
+                <option value="" disabled>
+                  выбрать запись
+                </option>
+                <option v-for="file in replayFiles" :key="file" :value="file">
+                  {{ file }}
+                </option>
+              </select>
+              <button
+                type="button"
+                :disabled="!replayLoaded"
+                :class="{ active: replayPlaying }"
+                @click="replayPlaying ? replay.pause() : replay.play()"
+              >
+                {{ replayPlaying ? 'Пауза' : 'Играть' }}
+              </button>
+              <button type="button" :disabled="!replayLoaded" @click="replay.stop()">
+                Стоп
+              </button>
+            </div>
+
+            <div class="row wrap">
+              <button
+                v-for="speed in REPLAY_SPEEDS"
+                :key="speed"
+                type="button"
+                :class="{ active: replay.state.value?.speed === speed }"
+                @click="replay.setSpeed(speed)"
+              >
+                {{ speed }}×
+              </button>
+            </div>
+
+            <!--
+              Перемотка по `change`, а не по `input`: иначе каждый пиксель
+              ползунка уходил бы отдельным запросом, а каждая перемотка
+              сбрасывает состояние матча.
+            -->
+            <input
+              class="scrub"
+              type="range"
+              min="0"
+              :max="Math.max(replayTotal - 1, 0)"
+              :value="Math.max(replayIndex - 1, 0)"
+              :disabled="!replayLoaded"
+              @change="replay.seek(Number(($event.target as HTMLInputElement).value))"
+            >
+
+            <p class="last-event">
+              {{ replay.state.value ? REPLAY_MODE_LABELS[replay.state.value.mode] : '—' }} ·
+              пакет {{ replayIndex }} из {{ replayTotal }} ·
+              скорость {{ replay.state.value?.speed ?? 1 }}×
+              <template v-if="replay.error.value">
+                <br><b>ошибка: {{ replay.error.value }}</b>
+              </template>
+            </p>
+            <p class="last-event">
+              перемотка начинает с чистого состояния матча: события из
+              пропущенного куска не срабатывают
+            </p>
+          </template>
         </div>
 
         <div class="group">
@@ -529,6 +631,11 @@ input:focus-visible {
 
 .legend dd {
   margin: 0;
+}
+
+.scrub {
+  width: 100%;
+  margin: 8px 0 0;
 }
 
 .last-event {

@@ -77,7 +77,7 @@ null-обработка WebGL, анимации от `delta`, маленький
 - [x] Сброс серверного состояния на границе матча
 - [x] [10](../.scratch/buddy-redesign/issues/10-session-record-replay.md) —
       запись GSI-сессии в файл
-- [ ] [10](../.scratch/buddy-redesign/issues/10-session-record-replay.md) —
+- [x] [10](../.scratch/buddy-redesign/issues/10-session-record-replay.md) —
       воспроизведение записи в реальном темпе, управление с пульта
 - [x] [11](../.scratch/buddy-redesign/issues/11-gsi-field-measurements.md) —
       **замер:** доходит ли блок `events` до обычного игрока — да, доходит,
