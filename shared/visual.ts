@@ -45,52 +45,64 @@ export interface VisualProps {
   asleep: boolean
 }
 
-export type VisualId = 'eyeMouth' | 'mouthOnly' | 'angular' | 'phase' | 'flat'
+export type VisualId
+  = | 'eye'
+    | 'supershape'
+    | 'torus'
+    | 'metaballs'
+    | 'crystal'
+    | 'breath'
 
 export interface VisualMeta {
   label: string
-  /** Чем этот визуал несёт валентность — единственное, чем они различаются. */
+  /** Семейство формы — главное, чем визуалы различаются. */
+  form: string
+  /** Чем этот визуал несёт валентность. */
   valenceCarrier: string
-  /** Доказательность носителя по разведке. */
-  evidence: string
-  /** '3d' рисуется в общем канвасе, 'dom' — сам собой. */
-  kind: '3d' | 'dom'
 }
 
+/**
+ * Возбуждение у всех визуалов одинаковое: темп и амплитуда движения плюс
+ * теплота тона. Это не экономия, а следствие замера — ускорение на
+ * возбуждение это лучшее отображение «движение → аффект» в литературе
+ * (ηp² = .870), тогда как ускорение на валентность — чистый ноль.
+ *
+ * Поэтому различаются они формой и носителем валентности.
+ */
 export const VISUALS: Record<VisualId, VisualMeta> = {
-  eyeMouth: {
-    label: 'Глаз и рот',
-    valenceCarrier: 'кривизна рта, геометрия век, светлота',
-    evidence: 'сильнейшая: рот — №1 носитель валентности, читается при 15×10 px',
-    kind: '3d',
+  eye: {
+    label: 'Глаз',
+    form: 'сфера с глазом',
+    valenceCarrier: 'геометрия век, светлота',
   },
-  mouthOnly: {
-    label: 'Только рот',
-    valenceCarrier: 'кривизна рта, светлота',
-    evidence: 'тот же носитель в одиночку; снимает ассоциацию со слежкой',
-    kind: '3d',
+  supershape: {
+    label: 'Супершейп',
+    form: 'суперформула Гилиса',
+    valenceCarrier: 'показатели формы: округлость ↔ шипы',
   },
-  angular: {
-    label: 'Угловатость',
-    valenceCarrier: 'угловатость низкочастотного силуэта',
-    evidence: 'реальная, но скромная: 42% против 28%, механизм оспорен',
-    kind: '3d',
+  torus: {
+    label: 'Кольцо',
+    form: 'тороидальный узел, дыра в силуэте',
+    valenceCarrier: 'толщина и собранность',
   },
-  phase: {
-    label: 'Фазовая когерентность',
-    valenceCarrier: 'согласованность фаз долей тела',
-    evidence: 'подтверждена для биологического движения, на абстракции не проверялась',
-    kind: '3d',
+  metaballs: {
+    label: 'Метасферы',
+    form: 'слипающиеся доли, поле',
+    valenceCarrier: 'связность: слияние ↔ распад',
   },
-  flat: {
-    label: 'Плоский силуэт',
-    valenceCarrier: 'кривизна рта, светлота — без объёма и бликов',
-    evidence: 'края, несомые яркостью, переживают подвыборку цвета и даунскейл',
-    kind: 'dom',
+  crystal: {
+    label: 'Кристалл',
+    form: 'выпуклая оболочка, плоские грани',
+    valenceCarrier: 'радиусы вершин: собранность ↔ осколок',
+  },
+  breath: {
+    label: 'Дыхание',
+    form: 'простое тело без черт',
+    valenceCarrier: 'только светлота',
   },
 }
 
-export const DEFAULT_VISUAL: VisualId = 'eyeMouth'
+export const DEFAULT_VISUAL: VisualId = 'eye'
 
 export function isVisualId(value: unknown): value is VisualId {
   return typeof value === 'string' && value in VISUALS

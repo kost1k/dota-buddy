@@ -126,8 +126,8 @@ const fmt = (n: number) => n.toFixed(3)
           </button>
         </div>
         <p class="carrier">
-          <b>валентность:</b> {{ VISUALS[visualId].valenceCarrier }}<br>
-          <span class="hint">{{ VISUALS[visualId].evidence }}</span>
+          <b>форма:</b> {{ VISUALS[visualId].form }}<br>
+          <b>валентность:</b> {{ VISUALS[visualId].valenceCarrier }}
         </p>
       </section>
 

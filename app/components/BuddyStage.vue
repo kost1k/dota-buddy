@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { VisualId, VisualProps } from '#shared/visual'
-import { VISUALS } from '#shared/visual'
-import VisualAngular from './visuals/VisualAngular.vue'
-import VisualEyeMouth from './visuals/VisualEyeMouth.vue'
-import VisualFlat from './visuals/VisualFlat.vue'
-import VisualMouthOnly from './visuals/VisualMouthOnly.vue'
-import VisualPhase from './visuals/VisualPhase.vue'
+import VisualBreath from './visuals/VisualBreath.vue'
+import VisualCrystal from './visuals/VisualCrystal.vue'
+import VisualEye from './visuals/VisualEye.vue'
+import VisualMetaballs from './visuals/VisualMetaballs.vue'
+import VisualSupershape from './visuals/VisualSupershape.vue'
+import VisualTorus from './visuals/VisualTorus.vue'
 
 /**
  * Сцена бадди: ровно один канвас на весь оверлей, и ровно один визуал
@@ -25,17 +25,17 @@ import VisualPhase from './visuals/VisualPhase.vue'
 const props = defineProps<{ asleep: boolean }>()
 
 const REGISTRY: Record<VisualId, Component> = {
-  eyeMouth: VisualEyeMouth,
-  mouthOnly: VisualMouthOnly,
-  angular: VisualAngular,
-  phase: VisualPhase,
-  flat: VisualFlat,
+  eye: VisualEye,
+  supershape: VisualSupershape,
+  torus: VisualTorus,
+  metaballs: VisualMetaballs,
+  crystal: VisualCrystal,
+  breath: VisualBreath,
 }
 
 const { visualId } = useVisual()
 const { state } = useAffect()
 
-const meta = computed(() => VISUALS[visualId.value])
 const visual = computed(() => REGISTRY[visualId.value])
 
 const visualProps = computed<VisualProps>(() => ({
@@ -69,10 +69,8 @@ const fpsLimit = computed(() => (props.asleep ? theme.scene.sleepFps : undefined
 
 <template>
   <div class="stage">
-    <component :is="visual" v-if="meta.kind === 'dom'" v-bind="visualProps" />
-
     <TresCanvas
-      v-else-if="probed && hasWebgl"
+      v-if="probed && hasWebgl"
       alpha
       :clear-alpha="0"
       :dpr="theme.scene.dpr"
