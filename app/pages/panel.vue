@@ -38,6 +38,27 @@ const REPLAY_MODE_LABELS: Record<ReplayMode, string> = {
   paused: 'пауза',
 }
 
+/**
+ * Ползунок перемотки ведёт СВОЁ значение, а не серверное.
+ *
+ * Состояние опрашивается раз в секунду, и привязка прямо к нему затирала
+ * позицию под пальцем: браузер к отпусканию видел прежнее значение и не слал
+ * `change` вовсе — перемотка не срабатывала ни разу. Пока ползунок ведут,
+ * сервер его не трогает; после отпускания слежение возвращается.
+ */
+const scrubbing = ref(false)
+const scrubValue = ref(0)
+
+watch(replayIndex, (value) => {
+  if (!scrubbing.value)
+    scrubValue.value = Math.max(value - 1, 0)
+}, { immediate: true })
+
+function commitSeek() {
+  scrubbing.value = false
+  replay.seek(scrubValue.value)
+}
+
 // Пульт слушает WebSocket наравне с оверлеем: иначе нижний уровень
 // проверял бы только путь «туда», а смысл именно в круге — пакет уходит на
 // сервер и возвращается разобранным.
@@ -318,18 +339,20 @@ const fmt = (n: number) => n.toFixed(3)
             </div>
 
             <!--
-              Перемотка по `change`, а не по `input`: иначе каждый пиксель
-              ползунка уходил бы отдельным запросом, а каждая перемотка
-              сбрасывает состояние матча.
+              Перемотка уходит на сервер по `change`, а не по `input`: иначе
+              каждый пиксель ползунка шёл бы отдельным запросом, а каждая
+              перемотка сбрасывает состояние матча.
             -->
             <input
+              v-model.number="scrubValue"
               class="scrub"
               type="range"
               min="0"
               :max="Math.max(replayTotal - 1, 0)"
-              :value="Math.max(replayIndex - 1, 0)"
               :disabled="!replayLoaded"
-              @change="replay.seek(Number(($event.target as HTMLInputElement).value))"
+              @pointerdown="scrubbing = true"
+              @input="scrubbing = true"
+              @change="commitSeek"
             >
 
             <p class="last-event">
@@ -392,7 +415,13 @@ const fmt = (n: number) => n.toFixed(3)
 
 <style scoped>
 .panel {
-  min-height: 100vh;
+  /*
+    Высота фиксированная, а не минимальная: прокрутку страницы отключает
+    `app.vue` — оверлею полосы прокрутки поверх игры не нужны, — поэтому
+    прокручиваться пульт обязан сам, а при `min-height` он растёт под
+    содержимое и не прокручивается никогда.
+  */
+  height: 100vh;
   padding: 24px;
   background: #0d1216;
   color: var(--db-ink);
