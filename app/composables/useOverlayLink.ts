@@ -2,7 +2,7 @@ import type { MatchSnapshot } from '#shared/snapshot'
 // Импорты явные, а не на автоимпорт Nuxt: он объявляет `shared/` в типах,
 // но в рантайме модуль не подтягивает — typecheck проходит, страница
 // падает. Ошибка молчаливая, поэтому лучше писать явно.
-import { baseArousal, baseValence } from '#shared/affect-signals'
+import { accumulateDamage, baseArousal, baseValence } from '#shared/affect-signals'
 import { isAwake } from '#shared/liveness'
 import { parseOverlayMessage } from '#shared/overlay-message'
 
@@ -35,17 +35,25 @@ export function useOverlayLink() {
      * Пересчёт объективной основы осей по новому снапшоту.
      *
      * Время между снапшотами берём по приходу, а не из `clock_time`: игра
-     * ставится на паузу, а реальный темп потока это не меняет, и скорость
-     * урона надо считать по нему.
+     * ставится на паузу, а реальный темп потока это не меняет, и урон
+     * надо копить по нему.
+     *
+     * Накопленный урон живёт ЗДЕСЬ, рядом с предыдущим снапшотом, а не на
+     * сервере. ADR-0002 это не нарушает: там речь о памяти, которую терять
+     * нельзя, — о свежести событий, копящейся весь матч. Запас урона
+     * затухает за пять секунд, и клиент после перезагрузки browser source
+     * всё равно начинает без предыдущего снапшота.
      */
     let previousSnapshot: typeof snapshot.value = null
     let previousAt = 0
+    let accumulatedDamage = 0
     function refreshBase(next: NonNullable<typeof snapshot.value>) {
       const now = Date.now()
       const elapsed = previousAt > 0 ? (now - previousAt) / 1000 : 0
+      accumulatedDamage = accumulateDamage(accumulatedDamage, previousSnapshot, next, elapsed)
       setBase({
         valence: baseValence(next),
-        arousal: baseArousal(previousSnapshot, next, elapsed),
+        arousal: baseArousal(next, accumulatedDamage),
       })
       previousSnapshot = next
       previousAt = now
@@ -65,6 +73,7 @@ export function useOverlayLink() {
           snapshot.value = null
           previousSnapshot = null
           previousAt = 0
+          accumulatedDamage = 0
           setBase({ valence: 0, arousal: 0 })
           break
         case 'sync':

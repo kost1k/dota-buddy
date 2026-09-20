@@ -1,6 +1,6 @@
 import type { MatchSnapshot } from '../shared/snapshot'
 import { describe, expect, it } from 'vitest'
-import { baseArousal, baseValence } from '../shared/affect-signals'
+import { accumulateDamage, baseArousal, baseValence } from '../shared/affect-signals'
 import { baselineSnapshot } from '../shared/synthetic'
 
 function snap(hero: Partial<MatchSnapshot['hero']> = {}, player: Partial<MatchSnapshot['player']> = {}, map: Partial<MatchSnapshot['map']> = {}): MatchSnapshot {
@@ -10,6 +10,11 @@ function snap(hero: Partial<MatchSnapshot['hero']> = {}, player: Partial<MatchSn
     player: { ...base.player, ...player },
     map: { ...base.map, ...map },
   }
+}
+
+/** Здоровье как доля: остальные поля героя в осях не участвуют. */
+function hp(fraction: number, hero: Partial<MatchSnapshot['hero']> = {}) {
+  return snap({ health: fraction * 1000, maxHealth: 1000, healthFraction: fraction, ...hero })
 }
 
 describe('валентность: преимущество в счёте', () => {
@@ -48,75 +53,149 @@ describe('валентность: преимущество в счёте', () =>
   })
 })
 
-describe('возбуждение: скорость урона', () => {
-  it('ноль в покое: полное здоровье, без дебаффов', () => {
-    expect(baseArousal(snap(), snap(), 1)).toBe(0)
+describe('накопленный урон: накопление', () => {
+  it('пустой накопитель без урона остаётся пустым', () => {
+    expect(accumulateDamage(0, hp(1), hp(1), 1)).toBe(0)
   })
 
-  it('растёт со СКОРОСТЬЮ потери, а не с уровнем здоровья', () => {
-    // Главный инвариант. Тревожит не «осталось 40%», а «сняли 40% за две
-    // секунды»; стабильные 40% в лесу тревожить не должны.
-    const from = snap({ health: 1000, maxHealth: 1000, healthFraction: 1 })
-    const to = snap({ health: 400, maxHealth: 1000, healthFraction: 0.4 })
-
-    const fast = baseArousal(from, to, 0.5)
-    const slow = baseArousal(from, to, 20)
-
-    expect(fast).toBeGreaterThan(slow)
-    expect(fast).toBeGreaterThan(0.7)
+  it('потеря здоровья пополняет накопитель', () => {
+    expect(accumulateDamage(0, hp(1), hp(0.7), 1)).toBeCloseTo(0.3, 2)
   })
 
-  it('стабильное здоровье не тревожит, каким бы оно ни было', () => {
-    const steady = snap({ health: 700, maxHealth: 1000, healthFraction: 0.7 })
-    expect(baseArousal(steady, steady, 1)).toBeLessThan(0.1)
+  // Разница с прежней конструкцией. Раньше брали мгновенную скорость, и
+  // серия мелких разменов давала серию отдельных выбросов. Теперь она
+  // складывается в один подъём.
+  it('серия мелких потерь складывается', () => {
+    let value = 0
+    for (let i = 0; i < 4; i++)
+      value = accumulateDamage(value, hp(1 - i * 0.05), hp(1 - (i + 1) * 0.05), 0.2)
+
+    const single = accumulateDamage(0, hp(1), hp(0.95), 0.2)
+    expect(value).toBeGreaterThan(single * 3)
   })
 
-  it('восстановление здоровья не считается уроном', () => {
-    const hurt = snap({ health: 300, maxHealth: 1000, healthFraction: 0.3 })
-    const healed = snap({ health: 900, maxHealth: 1000, healthFraction: 0.9 })
-    expect(baseArousal(hurt, healed, 1)).toBeLessThan(0.1)
+  it('лечение накопитель не опустошает', () => {
+    // Иначе хилка обрывала бы тревогу мгновенно, хотя по ощущению
+    // напряжение спадает постепенно.
+    const afterDamage = accumulateDamage(0, hp(1), hp(0.5), 0.5)
+    const afterHeal = accumulateDamage(afterDamage, hp(0.5), hp(1), 0.5)
+
+    expect(afterHeal).toBeGreaterThan(afterDamage * 0.8)
+  })
+})
+
+describe('накопленный урон: затухание', () => {
+  it('без нового урона убывает', () => {
+    const decayed = accumulateDamage(0.5, hp(1), hp(1), 5)
+    expect(decayed).toBeLessThan(0.5)
+    expect(decayed).toBeGreaterThan(0)
   })
 
-  it.each([0, -1, Number.NaN])('не ломается на некорректном времени: %p', (dt) => {
-    const from = snap({ healthFraction: 1 })
-    const to = snap({ healthFraction: 0.2 })
-    const value = baseArousal(from, to, dt)
+  // То же требование, что и у сглаживания аффекта: результат не должен
+  // зависеть от того, как часто вызвали. Каденция GSI плавает.
+  it('не зависит от частоты вызовов', () => {
+    const oneStep = accumulateDamage(0.5, hp(1), hp(1), 4)
+
+    let twoSteps = 0.5
+    twoSteps = accumulateDamage(twoSteps, hp(1), hp(1), 2)
+    twoSteps = accumulateDamage(twoSteps, hp(1), hp(1), 2)
+
+    expect(twoSteps).toBeCloseTo(oneStep, 9)
+  })
+
+  it('на первом снапшоте только затухает', () => {
+    expect(accumulateDamage(0.5, null, hp(0.1), 5)).toBeLessThan(0.5)
+  })
+
+  it.each([0, -1, Number.NaN])('переживает некорректное время: %p', (dt) => {
+    const value = accumulateDamage(0.5, hp(1), hp(0.2), dt)
     expect(Number.isFinite(value)).toBe(true)
     expect(value).toBeGreaterThanOrEqual(0)
   })
 })
 
+describe('возбуждение: урон', () => {
+  it('ноль в покое: полное здоровье, пустой накопитель, без дебаффов', () => {
+    expect(baseArousal(hp(1), 0)).toBe(0)
+  })
+
+  // Мёртвая зона у нуля. Без неё хвост затухания держал бы бадди вечно
+  // шевелящимся, а в покое амплитуда обязана быть РОВНО нулём: движущиеся
+  // стимулы перехватывают внимание и раздражают.
+  it('рядовой размен не поднимает ось вовсе', () => {
+    expect(baseArousal(hp(1), 0.04)).toBe(0)
+  })
+
+  it('серьёзный урон поднимает ось заметно', () => {
+    expect(baseArousal(hp(1), 0.3)).toBeGreaterThan(0.5)
+  })
+
+  it('растёт по накопленному урону', () => {
+    let previous = Number.NEGATIVE_INFINITY
+    for (const damage of [0.1, 0.2, 0.3, 0.5]) {
+      const value = baseArousal(hp(1), damage)
+      expect(value).toBeGreaterThan(previous)
+      previous = value
+    }
+  })
+
+  // Инвариант тикета 09 сохраняется, но выражен иначе: тот же урон,
+  // растянутый во времени, успевает затухнуть и тревожит слабее.
+  it('тот же урон медленнее тревожит слабее', () => {
+    const fast = accumulateDamage(0, hp(1), hp(0.4), 0.5)
+
+    let slow = 0
+    for (let i = 0; i < 6; i++)
+      slow = accumulateDamage(slow, hp(1 - i * 0.1), hp(1 - (i + 1) * 0.1), 4)
+
+    expect(baseArousal(hp(0.4), fast)).toBeGreaterThan(baseArousal(hp(0.4), slow))
+  })
+
+  it('стабильное здоровье не тревожит, каким бы оно ни было', () => {
+    expect(baseArousal(hp(0.7), 0)).toBeLessThan(0.1)
+  })
+})
+
 describe('возбуждение: дебаффы и низкое здоровье', () => {
+  // Правка к тикету 09. Там дебаффы включены как «краткие, наблюдаемые,
+  // означают сейчас решается». Для именованных флагов это верно; для
+  // `has_debuff` измерение на живой записи дало 22% матча и 90
+  // переключений — он истинен при любом отрицательном модификаторе,
+  // вплоть до замедления от крипа, и посылка к нему не относится.
+  it('has_debuff ось не двигает', () => {
+    expect(baseArousal(hp(1, { hasDebuff: true }), 0)).toBe(0)
+  })
+
   it('обездвиживание тревожнее прочих дебаффов', () => {
-    const stunned = baseArousal(snap(), snap({ stunned: true }), 1)
-    const silenced = baseArousal(snap(), snap({ silenced: true }), 1)
+    const stunned = baseArousal(hp(1, { stunned: true }), 0)
+    const silenced = baseArousal(hp(1, { silenced: true }), 0)
 
     expect(stunned).toBeGreaterThan(silenced)
     expect(silenced).toBeGreaterThan(0)
   })
 
+  it('хекс считается обездвиживанием', () => {
+    expect(baseArousal(hp(1, { hexed: true }), 0)).toBe(baseArousal(hp(1, { stunned: true }), 0))
+  })
+
   it('два дебаффа не вдвое тревожнее одного', () => {
-    const one = baseArousal(snap(), snap({ stunned: true }), 1)
-    const two = baseArousal(snap(), snap({ stunned: true, silenced: true }), 1)
+    const one = baseArousal(hp(1, { stunned: true }), 0)
+    const two = baseArousal(hp(1, { stunned: true, silenced: true }), 0)
     expect(two).toBeCloseTo(one, 9)
   })
 
   it('низкое здоровье добавляет поправку', () => {
     // Иначе тихое умирание от яда не дало бы ничего: урон медленный,
     // дебаффа может не быть.
-    const low = snap({ health: 80, maxHealth: 1000, healthFraction: 0.08 })
-    expect(baseArousal(low, low, 1)).toBeGreaterThan(0.25)
+    expect(baseArousal(hp(0.08), 0)).toBeGreaterThan(0.25)
   })
 
   it('мёртвый герой поправку по здоровью не получает', () => {
-    const dead = snap({ alive: false, health: 0, healthFraction: 0 })
-    expect(baseArousal(dead, dead, 1)).toBe(0)
+    expect(baseArousal(snap({ alive: false, health: 0, healthFraction: 0 }), 0)).toBe(0)
   })
 
   it('никогда не выходит за 0..1', () => {
-    const from = snap({ healthFraction: 1 })
-    const to = snap({ healthFraction: 0.01, stunned: true, silenced: true, hasDebuff: true })
-    const value = baseArousal(from, to, 0.1)
+    const value = baseArousal(hp(0.01, { stunned: true, silenced: true, hasDebuff: true }), 1)
     expect(value).toBeLessThanOrEqual(1)
     expect(value).toBeGreaterThanOrEqual(0)
   })
