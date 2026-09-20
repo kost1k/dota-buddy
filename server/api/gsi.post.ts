@@ -1,5 +1,8 @@
 import { readSnapshot } from '#shared/snapshot'
 import { createLogger } from '../utils/logger'
+import { initRecordingFromEnv, recordRawSnapshot } from '../utils/recorder'
+
+initRecordingFromEnv()
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -37,6 +40,11 @@ export default defineEventHandler(async (event) => {
       return { status: 'error', code: 'unauthorized' }
     }
   }
+
+  // Пишем СЫРОЕ тело, до санитизации: запись должна отражать то, что
+  // действительно присылает Dota, а не наши представления о формате.
+  // Иначе ошибка в поле осталась бы невидимой и в записи тоже.
+  recordRawSnapshot(body)
 
   // Dota шлёт пустой объект при окончании матча или сессии. Это не ошибка,
   // а переход в сон — и заодно граница, после которой состояние матча
