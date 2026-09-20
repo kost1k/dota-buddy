@@ -6,6 +6,7 @@ Researched 2026-09-19. Scope: what a local Nitro `POST /api/gsi` endpoint can ac
 
 | Tier | Sources used |
 | --- | --- |
+| **A⁺ — own capture** | `recordings/session.jsonl`, one full normal matchmaking game captured 2026-09-20: 2137 packets, 37.7 minutes, ranked-style lobby, own hero. Strongest evidence available for player mode, because it is *this* project's endpoint receiving *this* game. Claims resting on it are marked `[measured]`. |
 | **A — Valve** | Valve Developer Community GSI page (CS:GO/CS2 page is the only Valve-authored prose describing `uri`/`timeout`/`buffer`/`throttle`/`heartbeat`; Dota 2 reuses the same engine mechanism). No Valve page documents the Dota 2 `data` block list. |
 | **B — captured payloads** | `MrBean355/dota2-gsi` test fixtures are real captured client payloads, split into `*_playing.json` (normal match) and `*_spectating.json`. These are the strongest evidence for player-vs-spectator differences. |
 | **C — library schemas** | `antonpup/Dota2GSI` (C#) parser source — field names it reads. Reflects the union of observed payloads, not a guarantee every field appears. |
@@ -68,14 +69,16 @@ From `antonpup/Dota2GSI` README (tier C) — the most complete published cfg:
 | `buildings` | yes but **only your own team's** key (fixture has `radiant` only) | yes, both `radiant` and `dire` | `buildings_playing.json` vs `buildings_spectating.json` |
 | `draft` | **not observed** in a normal match | yes (`activeteam`, `team2`/`team3` picks+bans) | only `draft_spectator.json` exists |
 | `wearables` | yes, your own cosmetics | yes, all players | `wearables_*.json` |
-| `events` | `[community]` unclear — fixture is not split playing/spectating | yes | `events.json` |
+| `events` | **yes** `[measured]` — present in all 2137 packets, and it carries cross-team events | yes | own capture 2026-09-20 |
 | `league` | no (only meaningful in league/ticketed games) | yes | `League.cs` |
 | `minimap` | `[community]` almost certainly spectator-only — it enumerates every visible unit | yes | `Minimap.cs` |
 | `roshan` | **no** — `map_playing.json` lacks even `roshan_state` | yes | fixtures |
 | `couriers` | `[community]` unverified; likely own-team only | yes | `Couriers.cs` |
 | `neutralitems` | `[community]` unverified | yes | `NeutralItems.cs` |
 
-**Verified rule of thumb:** as a player you get your own hero/items/abilities/player-stats, your own team's buildings, and a trimmed `map`. Everything cross-team is spectator-only. Valve states the restriction explicitly for CS:GO and the Dota fixtures confirm the same shape; the phrase used across community docs is that information "is limited to the player's or observer's role to prevent cheating."
+**Verified rule of thumb:** as a player you get your own hero/items/abilities/player-stats, your own team's buildings, and a trimmed `map`. Cross-team **state** is spectator-only. Valve states the restriction explicitly for CS:GO and the Dota fixtures confirm the same shape; the phrase used across community docs is that information "is limited to the player's or observer's role to prevent cheating."
+
+**The exception, and it is a large one** `[measured]`**:** cross-team *events* are **not** restricted. The `events` block delivers hero kills for all ten players, tower and barracks kills, Roshan and aegis, buybacks, smoke, glyph and scan — see §4. The restriction is about continuous state, not about the discrete things a player can already see in the kill feed and hear from the announcer. This is consistent rather than contradictory: nothing in `events` tells you anything you would not learn by looking at the top bar.
 
 **Not a block, but worth knowing:** the cfg needs the `-gamestateintegration` launch option, and the file must be `gamestate_integration_*.cfg` in `.../dota 2 beta/game/dota/cfg/gamestate_integration/`.
 
@@ -195,9 +198,50 @@ Setting `throttle 0` is possible but `[community]` reports of it being useful ar
 ]
 ```
 
-### Directly reported event types (complete known list)
+### Directly reported event types
 
-From `antonpup/Dota2GSI` `EventsProvider/Event.cs` (tier C) — **6 types total**:
+⚠️ **The "6 types" list below is incomplete.** It is what `antonpup/Dota2GSI` parses, not what the client sends. The 2026-09-20 capture contains **two further `event_type` values that no surveyed library models**, and one of them carries most of the interesting traffic:
+
+| `event_type` | Occurrences `[measured]` | Payload |
+| --- | --- | --- |
+| `generic_event` | 6680 (85%) | `data` — a **JSON string**, not an object; parse it separately. Inside: `{ type: "CHAT_MESSAGE_*", value, playerid1..6, value2, value3, time }` |
+| `chat_message` | 866 | `player_id`, `channel_type`, `message` — free text typed by players |
+
+The `CHAT_MESSAGE_*` types seen in one match, by unique-event count:
+
+| `data.type` | Unique | What it marks |
+| --- | --- | --- |
+| `CHAT_MESSAGE_HERO_KILL` | 72 | every hero kill in the match, both teams; `playerid1` killer, `playerid2` victim |
+| `CHAT_MESSAGE_ITEM_PURCHASE` | 51 | any player's purchase |
+| `CHAT_MESSAGE_STREAK_KILL` | 28 | killing spree announcements |
+| `CHAT_MESSAGE_HERO_BANNED` | 18 | draft bans |
+| `CHAT_MESSAGE_TOWER_KILL` | 13 | **either team's** towers |
+| `CHAT_MESSAGE_SENTRY_WARD_KILLED` / `OBSERVER_WARD_KILLED` | 7 / 4 | ward kills |
+| `CHAT_MESSAGE_BARRACKS_KILL` | 6 | barracks |
+| `CHAT_MESSAGE_RUNE_BOTTLE` | 5 | rune bottled |
+| `CHAT_MESSAGE_BUYBACK` | 4 | any player's buyback |
+| `CHAT_MESSAGE_COURIER_LOST` / `COURIER_RESPAWNED` | 4 / 4 | couriers |
+| `CHAT_MESSAGE_GLYPH_USED` | 4 | glyph |
+| `CHAT_MESSAGE_PAUSED` / `UNPAUSED` / `UNPAUSE_COUNTDOWN` | 2 / 2 / 6 | pause handling |
+| `CHAT_MESSAGE_SMOKE_ACTIVATED` | 2 | smoke |
+| `CHAT_MESSAGE_SCAN_USED` | 2 | scan |
+| `CHAT_MESSAGE_FIRSTBLOOD` | 1 | first blood — a dedicated marker, no diffing needed |
+| `CHAT_MESSAGE_MINIBOSS_KILL` | 1 | tormentor |
+| `CHAT_MESSAGE_SUPER_CREEPS` | 1 | mega creeps |
+| `CHAT_MESSAGE_DISCONNECT_*` / `RECONNECT` | — | player connectivity |
+| `CHAT_MESSAGE_INTHEBAG`, `INFORMATIONAL`, `REPORT_REMINDER`, `HERO_CHOICE_INVALID` | — | chatter, no game meaning |
+
+This list is one match's worth and is certainly not exhaustive — no Aegis denial, no Divine Rapier, no Roshan-related chat types appeared. Parse `data.type` as an open string.
+
+#### Two properties that will bite an implementation `[measured]`
+
+**Events repeat.** `events` is a rolling window, not a delta. The capture holds 7846 event occurrences but only **290 unique events**; each one persists for a median of **27 consecutive packets** (~30 s of wall clock, max 121 during a pause). A consumer that reacts per packet fires roughly 27 times per kill. Deduplicate on the whole event object — `game_time` plus payload is stable across repeats.
+
+**Delivery is prompt.** Comparing each unique event's `game_time` against `map.game_time` in the first packet carrying it: median **1 s**, max **2 s**, never negative. Events arrive in the next snapshot after they happen. The measurement is quantised by `map.game_time`'s 1-second resolution, so 1 s is the floor this method can report, not a measured delay — the honest reading is "within one poll interval".
+
+#### The six types libraries do model
+
+From `antonpup/Dota2GSI` `EventsProvider/Event.cs` (tier C). Four of the six were observed in the capture; `courier_killed` and `aegis_denied` were not, which says nothing about availability:
 
 | `event_type` | Payload fields |
 | --- | --- |
@@ -214,11 +258,11 @@ From `antonpup/Dota2GSI` `EventsProvider/Event.cs` (tier C) — **6 types total*
 
 | Event | How to derive |
 | --- | --- |
-| **First blood** | First transition where any `radiant_score`/`dire_score` goes 0 → 1, or first `player.kills` increment. No dedicated event. |
+| **First blood** | ~~No dedicated event.~~ `[measured]` `CHAT_MESSAGE_FIRSTBLOOD` arrives as a `generic_event`. Diffing the score 0 → 1 remains a fallback. |
 | **Kill / death / assist** | Diff `player.kills` / `deaths` / `assists`. `kill_list` (`victimid_N`) tells you *whom* you killed. |
 | **Kill streak / multi-kill** | `player.kill_streak` is a **directly provided counter** (resets on death) — no diffing needed. True multi-kill (N kills within a time window) must be derived by timestamping `kills` increments. |
 | **Buyback** | Diff `hero.buyback_cooldown` 0 → >0, or `player.gold_spent_on_buybacks` increasing (spectator only). |
-| **Tower / barracks kill** | Diff `buildings.*` — building disappears or health hits 0. Player-mode only sees own team, so enemy tower kills are spectator-only. |
+| **Tower / barracks kill** | ~~Enemy tower kills are spectator-only.~~ `[measured]` `CHAT_MESSAGE_TOWER_KILL` and `CHAT_MESSAGE_BARRACKS_KILL` arrive in player mode for **both** teams. Diffing `buildings.*` still gives own-team health; the event gives the fact. |
 | **Item purchase** | Diff `items.slot*` / `stash*` names. `purchaser` tells you who bought it. |
 | **Rune pickup** | Only *bounty* runes have an event. Power/water/wisdom runes must be inferred (`player.runes_activated` — spectator only; or `items.slot8.contains_rune` for a bottled rune). |
 | **Smoke used** | `hero.smoked` false → true. |
@@ -226,7 +270,7 @@ From `antonpup/Dota2GSI` `EventsProvider/Event.cs` (tier C) — **6 types total*
 | **Talent taken** | `hero.talent_N` false → true. |
 | **Level up / stat point** | Diff `hero.level`, `hero.attributes_level`. |
 | **Respawn / death** | Diff `hero.alive`; `respawn_seconds` gives the countdown. |
-| **Roshan timer** | Spectator: `map.roshan_state` + `roshan_state_end_seconds`, or `roshan.spawn_phase` + `phase_time_remaining`. Playing: derive from the `roshan_killed` event's `game_time` (if `events` is delivered to players — unverified). |
+| **Roshan timer** | Spectator: `map.roshan_state` + `roshan_state_end_seconds`, or `roshan.spawn_phase` + `phase_time_remaining`. Playing: `[measured]` `roshan_killed` **is** delivered, with `killed_by_team` and `killer_player_id`, as is `aegis_picked_up`. A player-mode Roshan timer is therefore possible: start it from the event's `game_time`. |
 | **Game phase transitions** | Diff `map.game_state`. |
 
 **Architectural note for this repo:** because the derived list dwarfs the native list, the Nitro ingest layer should keep the previous snapshot and emit a normalized internal event stream over the WebSocket. Do not push raw GSI to the TresJS overlay. Valve also sends `previously` and `added` sub-trees containing only what changed — use them as a hint for cheap change detection, but keep your own authoritative previous snapshot, because `[community]` `xzion/dota2-gsi` warns "the client does not announce all keys in an 'added' event."
@@ -293,7 +337,9 @@ MIT licensed. Ships prebuilt JSON in `build/`: `heroes.json`, `items.json`, `abi
 
 ## 6. What you can learn about the enemy team in a normal match
 
-**Short answer: essentially nothing about enemy heroes, and only aggregate scoreboard numbers about the match.**
+**Short answer: nothing about enemy *state*, but a full feed of what enemies *did*.**
+
+The original answer here was "essentially nothing". The 2026-09-20 capture corrected it: continuous state is restricted exactly as described below, but the `events` feed is not. Keep the two apart when planning features — "who is alive right now" is unavailable, "who just died" is not.
 
 ### Available to a normal player
 
@@ -305,15 +351,20 @@ MIT licensed. Ships prebuilt JSON in `build/`: `heroes.json`, `items.json`, `abi
 | **Your own team's** building health | `buildings.<your team>` |
 | Who **you** killed | `player.kill_list` → `victimid_N` |
 | Your own everything | `hero`, `items`, `abilities`, `player`, `wearables` |
-| Roshan/aegis/courier/bounty-rune events for **both** teams | `events` array — **if** `events` is delivered in player mode (unverified; see below) |
+| Roshan kills, aegis pickups, bounty runes, tips | `events` — `[measured]`, confirmed in player mode |
+| **Every hero kill in the match**, killer and victim by slot | `events` → `generic_event` → `CHAT_MESSAGE_HERO_KILL` `[measured]` |
+| **Either team's** tower and barracks kills | `CHAT_MESSAGE_TOWER_KILL`, `CHAT_MESSAGE_BARRACKS_KILL` `[measured]` |
+| Any player's buyback, smoke, glyph, scan, ward kills, courier deaths | corresponding `CHAT_MESSAGE_*` `[measured]` |
+| First blood, tormentor, mega creeps | `CHAT_MESSAGE_FIRSTBLOOD` / `MINIBOSS_KILL` / `SUPER_CREEPS` `[measured]` |
+| All-chat and team-chat text | `events` → `chat_message` `[measured]` — note this is personal data; strip it before a recording leaves the machine |
 
 ### NOT available to a normal player
 
 - Enemy hero identities, levels, HP/mana, positions, respawn timers, buyback status, items, abilities, cooldowns. Confirmed by the fixture split: `hero`/`items`/`abilities`/`player` are flat objects in playing mode and only gain `team2`/`team3` nesting in spectating mode.
 - **Your own allies'** hero/item/ability state. The playing payload is *local player only* — not "your team". This is a common misconception; there is no ally data in the `*_playing.json` fixtures.
-- Enemy buildings (`buildings_playing.json` contains only `radiant`).
+- Enemy building **health** (`buildings_playing.json` contains only `radiant`) — though the *fact* of a tower falling does arrive as an event.
 - Enemy or ally positions / wards (`minimap` block).
-- Roshan state (`map.roshan_state`, `roshan` block are both absent in playing mode).
+- Roshan **state** (`map.roshan_state`, `roshan` block are both absent in playing mode) — but `roshan_killed` and `aegis_picked_up` events do arrive, so the timer can be reconstructed.
 - Glyph/scan cooldowns, lotus/wisdom-shrine state, tormentor state, watcher control (spectator `map` only).
 - Draft picks and bans (`draft` has no playing fixture).
 - Per-player advanced stats for anyone, including **yourself**: `net_worth`, `hero_damage`, `tower_damage`, `wards_placed`, `camps_stacked`, `support_gold_spent`, `runes_activated` and the damage-accounting block are spectator-payload-only.
@@ -322,7 +373,7 @@ MIT licensed. Ships prebuilt JSON in `build/`: `heroes.json`, `items.json`, `abi
 
 The overlay has **two genuinely different data regimes**, not one with more or less detail:
 
-1. **Player mode** — a rich *self* HUD: your HP/mana/gold/K-D-A/CS, your item and ability cooldowns, talents, buyback affordability + cooldown, respawn timer, smoke/debuff state, your team's tower health, plus the shared events (Roshan, aegis, bounty runes, courier kills) and the scoreboard. That is a genuinely good overlay, but it is about *you*.
+1. **Player mode** — a rich *self* HUD **plus a full match event feed**: your HP/mana/gold/K-D-A/CS, your item and ability cooldowns, talents, buyback affordability + cooldown, respawn timer, smoke/debuff state, your team's tower health — and, `[measured]`, every kill, tower, barracks, Roshan, aegis, buyback, smoke and glyph in the match, for both teams. The state is about *you*; the events are about the *match*. An overlay that reacts to teamfights is therefore possible in player mode, which the first survey concluded it was not.
 2. **Spectator/observer mode** — the full ten-player scoreboard, draft, minimap, Roshan/tormentor/glyph/scan timers, both teams' buildings, neutral items, couriers.
 
 Build the WebSocket contract with a discriminated `mode: "playing" | "spectating"` from the start rather than retrofitting it. Detect it structurally: if `player` (or `hero`) has `team2`/`team3` keys, you are spectating.
@@ -331,11 +382,11 @@ Build the WebSocket contract with a discriminated `mode: "playing" | "spectating
 
 ## Open questions / not verified
 
-1. **Is `events` delivered to a normal player, or spectator-only?** `MrBean355`'s `events.json` fixture is not suffixed `_playing`/`_spectating`, unlike every other fixture — which is suggestive but not proof. This matters a lot: it's the difference between having and not having a Roshan/aegis feed in player mode. **Test empirically in a bot match.**
+1. ~~**Is `events` delivered to a normal player, or spectator-only?**~~ **ANSWERED 2026-09-20, own capture.** Yes, in every packet, and it carries far more than the Roshan/aegis feed this question anticipated — see §4. The answer changed what player mode is capable of; §1, §4 and §6 were rewritten accordingly.
 2. **`couriers` / `neutralitems` / `minimap` in player mode** — no playing fixtures exist. Assume spectator-only until measured.
-3. **Real event→POST latency.** No primary source measures it; community reports range from the ~100ms implied by `throttle 0.1` to a flat 1s (Valve issue #35475, open, no response). Measure it.
+3. **Real event→POST latency.** `[measured]` **Partially answered 2026-09-20.** In game-time terms an event reaches the endpoint within one poll interval: median 1 s, max 2 s across 290 unique events, never negative. Observed packet cadence at the server was median 1143 ms, p95 1198 ms, over 2136 intervals. Still open: the *wall-clock* component, which this method cannot separate from the poll interval — `map.game_time` is quantised to whole seconds. Measuring it needs a clock shared between the game and the endpoint.
 4. **Whether `throttle "0"` is accepted** by the Dota client and what it costs. Untested.
-5. **`map.matchid` is a string in the fixture but typed `long` by `antonpup`.** Likely a string in the wire format; don't assume.
+5. ~~**`map.matchid` is a string in the fixture but typed `long` by `antonpup`.**~~ **ANSWERED 2026-09-20:** `[measured]` string on the wire, in all 2132 packets that carry `map`. Keep coercing defensively anyway — `antonpup` typing it `long` means someone saw a number somewhere.
 6. **Field churn.** `provider.version` bumps with patches and fields appear/vanish (e.g. `facet` is recent, `tormentor_*` newer still). Schema validation should be lenient — parse defensively, never assume a key is present.
 
 ---
