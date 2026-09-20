@@ -1,21 +1,16 @@
 import type { AffectState } from '#shared/affect'
 import type { BuddyEvent } from '#shared/events'
-import type { Milestones } from '#shared/milestones'
 import { findEventKind } from '#shared/events'
-import { applyMilestone, MAX_LEVEL, NO_MILESTONES } from '#shared/milestones'
-import { eventWeight, recoverFreshness, spendFreshness } from '#shared/reaction'
 
 /**
- * Срабатывание событий: свежесть, вес, сдвиг цели и импульс.
+ * Применение событий к аффекту.
  *
- * Свежесть по-хорошему принадлежит серверу — она состояние матча и обязана
- * пережить перезагрузку browser source, иначе после смены сцены в OBS бадди
- * сочтёт десятую смерть первой. Пока серверного вывода событий нет
- * (рубеж 2), счётчики живут здесь, и это временно.
+ * Свежесть, вывод событий и подсчёт веса живут на СЕРВЕРЕ (ADR-0002,
+ * тикет 08): это состояние матча, и оно обязано пережить перезагрузку
+ * browser source. Здесь остаётся только применение — сдвиг цели и импульс.
  *
- * Выбор профиля движения тут не делается и не будет: профили у каждого
- * визуала свои, и знать о них должен только визуал — иначе каждый новый
- * потребовал бы правки общего слоя.
+ * Выбор профиля движения тут тоже не делается: профили у каждого визуала
+ * свои, и знать о них должен только визуал.
  */
 
 /** Насколько вес события сдвигает ЦЕЛЬ аффекта — медленное последствие. */
@@ -26,71 +21,55 @@ const IMPULSE_SCALE = 0.9
 
 export function useReactions() {
   const { target, setTarget, addImpulse } = useAffect()
-
-  /** Свежесть по типу события и время последнего пересчёта. */
-  const freshness = useState<Record<string, number>>('reactions:freshness', () => ({}))
-  const seenAt = useState<Record<string, number>>('reactions:seenAt', () => ({}))
   const lastEvent = useState<BuddyEvent | null>('reactions:last', () => null)
-  const counter = useState<number>('reactions:counter', () => 0)
-  const milestones = useState<Milestones>('reactions:milestones', () => ({ ...NO_MILESTONES }))
-  /** Уровень героя. На рубеже 2 придёт из снапшота; пока растёт по кнопке. */
-  const level = useState<number>('reactions:level', () => 1)
+  const localCounter = useState<number>('reactions:localCounter', () => 0)
 
-  function fire(kindId: string, now = Date.now()): BuddyEvent | null {
+  /** Применяет событие: медленный сдвиг цели и быстрый импульс поверх. */
+  function apply(event: BuddyEvent) {
+    lastEvent.value = event
+
+    // Два механизма, разделённые по времени. Одним не выйдет: цель ведёт
+    // медленная ось с постоянной в двенадцать секунд, а рывок обязан
+    // уложиться в доли секунды.
+    const shift: AffectState = {
+      valence: target.value.valence + event.direction.valence * event.weight * TARGET_SHIFT,
+      arousal: target.value.arousal + event.direction.arousal * event.weight * TARGET_SHIFT,
+    }
+    setTarget(shift)
+    addImpulse({
+      valence: event.direction.valence * event.weight * IMPULSE_SCALE,
+      arousal: event.direction.arousal * event.weight * IMPULSE_SCALE,
+    })
+  }
+
+  /**
+   * Срабатывание в обход сервера. ТОЛЬКО для пульта.
+   *
+   * Вес берётся полной амплитудой: свежести здесь нет и быть не может —
+   * она на сервере. Значит кнопка пульта бьёт сильнее, чем то же событие в
+   * настоящем матче после нескольких повторов, и это нормально: её задача
+   * — быстро посмотреть реакцию, а не воспроизвести матч. Для
+   * воспроизведения есть сценарии, которые идут через сервер.
+   */
+  function fire(kindId: string): BuddyEvent | null {
     const kind = findEventKind(kindId)
     if (!kind)
       return null
 
-    // Однократные события свежесть не тратят и не читают: приглушать
-    // нечего, повтора не будет. Флаг явный, а не выведенный из природы
-    // события, — иначе поведение сломается беззвучно, стоит добавить
-    // повторяющуюся веху.
-    let weight = kind.amplitude
-    if (!kind.oneShot) {
-      const previousAt = seenAt.value[kindId]
-      const stored = freshness.value[kindId] ?? 1
-      const current = previousAt === undefined
-        ? 1
-        : recoverFreshness(stored, (now - previousAt) / 1000)
-
-      // Вес считается ОДИН раз, здесь. Пересчёт при отрисовке дал бы разный
-      // результат в зависимости от того, когда на событие посмотрели.
-      weight = eventWeight(kind.amplitude, current)
-      freshness.value = { ...freshness.value, [kindId]: spendFreshness(current) }
-      seenAt.value = { ...seenAt.value, [kindId]: now }
-    }
-
-    if (kind.milestone)
-      milestones.value = applyMilestone(milestones.value, kind.milestone)
-
-    if (kindId === 'levelUp' || kindId === 'levelLandmark')
-      level.value = Math.min(level.value + 1, MAX_LEVEL)
-
-    counter.value += 1
-
+    // Отрицательные идентификаторы отличают локальные срабатывания от
+    // серверных: иначе они столкнулись бы номерами, и визуал счёл бы новое
+    // событие уже виденным.
+    localCounter.value += 1
     const event: BuddyEvent = {
-      id: counter.value,
+      id: -localCounter.value,
       kindId: kind.id,
       tier: kind.tier,
-      weight,
+      weight: kind.amplitude,
       direction: kind.direction,
     }
-    lastEvent.value = event
-
-    // Два механизма, разделённые по времени: цель уезжает надолго,
-    // импульс бьёт сразу и гаснет за доли секунды.
-    const shift: AffectState = {
-      valence: target.value.valence + kind.direction.valence * weight * TARGET_SHIFT,
-      arousal: target.value.arousal + kind.direction.arousal * weight * TARGET_SHIFT,
-    }
-    setTarget(shift)
-    addImpulse({
-      valence: kind.direction.valence * weight * IMPULSE_SCALE,
-      arousal: kind.direction.arousal * weight * IMPULSE_SCALE,
-    })
-
+    apply(event)
     return event
   }
 
-  return { fire, lastEvent, freshness, milestones, level }
+  return { apply, fire, lastEvent }
 }

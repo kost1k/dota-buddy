@@ -18,6 +18,25 @@ export function useSnapshotSender() {
   const running = useState<string | null>('sender:running', () => null)
   const sent = useState<number>('sender:sent', () => 0)
   const error = useState<string | null>('sender:error', () => null)
+  const adopted = useState<boolean>('sender:adopted', () => false)
+
+  /**
+   * После перезагрузки страницы пульт подхватывает состояние с сервера, а
+   * не начинает с нуля.
+   *
+   * Иначе счётчики матча откатываются назад, сервер справедливо считает это
+   * новым матчем и сбрасывает свежесть — то есть перезагрузка пульта
+   * незаметно обнуляла бы ровно то, что мы и хотим на ней проверить.
+   */
+  if (import.meta.client) {
+    const { snapshot: received } = useOverlayLink()
+    watch(received, (value) => {
+      if (!value || adopted.value || sent.value > 0)
+        return
+      snapshot.value = value
+      adopted.value = true
+    }, { immediate: true })
+  }
 
   async function push(next: MatchSnapshot) {
     snapshot.value = next
@@ -53,10 +72,12 @@ export function useSnapshotSender() {
     }
   }
 
+  /** Полный сброс: новый матч. Сервер поймёт это по откату счётчиков. */
   function reset() {
     snapshot.value = baselineSnapshot()
     sent.value = 0
     error.value = null
+    adopted.value = true
   }
 
   return { snapshot, running, sent, error, push, run, reset }

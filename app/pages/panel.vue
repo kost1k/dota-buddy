@@ -20,7 +20,7 @@ useHead({ title: 'Dota Buddy — пульт' })
 
 const { state, target, setTarget, setState } = useAffect()
 const { visualId, setVisual } = useVisual()
-const { fire, freshness, milestones, level } = useReactions()
+const { fire } = useReactions()
 const sender = useSnapshotSender()
 
 // Пульт слушает WebSocket наравне с оверлеем: иначе нижний уровень
@@ -33,7 +33,7 @@ useAffectTicker()
 /** Когда включено, ползунки пишут состояние напрямую — инерции не видно. */
 const driveDirectly = ref(false)
 const previewAsleep = ref(false)
-const lastEvent = ref<string | null>(null)
+const lastEventLabel = ref<string | null>(null)
 
 function drive(axis: keyof AffectState, raw: string | number) {
   const value = Number(raw)
@@ -67,7 +67,7 @@ const PRESET_LABELS: Record<keyof typeof AFFECT_PRESETS, string> = {
 function fireEvent(kind: (typeof EVENT_KINDS)[number]) {
   const event = fire(kind.id)
   if (event)
-    lastEvent.value = `${kind.label} → ${ESCALATION_TIERS[kind.tier].label}, вес ${event.weight.toFixed(2)}`
+    lastEventLabel.value = `${kind.label} → ${ESCALATION_TIERS[kind.tier].label}, вес ${event.weight.toFixed(2)}`
 }
 
 /** Координаты точки на плоскости в процентах, для графика. */
@@ -232,7 +232,7 @@ const fmt = (n: number) => n.toFixed(3)
             </button>
           </div>
           <p class="last-event">
-            вернулось: {{ received ? `уровень ${received.hero.level}, ${received.hero.alive ? 'жив' : 'мёртв'}` : 'ничего' }} ·
+            вернулось: {{ received ? `${received.hero.alive ? 'жив' : 'мёртв'}, здоровье ${Math.round(received.hero.healthFraction * 100)}%` : 'ничего' }} ·
             связь {{ awake ? 'есть' : 'тишина' }}
           </p>
           <p class="last-event">
@@ -246,7 +246,10 @@ const fmt = (n: number) => n.toFixed(3)
         </div>
 
         <div class="group">
-          <h2>События <span class="hint">цифра — остаток свежести, он глушит вес повторов</span></h2>
+          <h2>
+            События
+            <span class="hint">мимо сервера, полной амплитудой — для сценариев ниже свежесть считает сервер</span>
+          </h2>
           <div class="row wrap">
             <!--
               Подсказка уровня живёт в легенде ниже, а не в title кнопки:
@@ -261,7 +264,7 @@ const fmt = (n: number) => n.toFixed(3)
               @click="fireEvent(kind)"
             >
               {{ kind.label }}
-              <span class="tier">{{ (freshness[kind.id] ?? 1).toFixed(2) }}</span>
+              <span class="tier">{{ ESCALATION_TIERS[kind.tier].label }}</span>
             </button>
           </div>
           <dl class="legend">
@@ -271,12 +274,13 @@ const fmt = (n: number) => n.toFixed(3)
             </template>
           </dl>
           <p class="last-event">
-            {{ lastEvent ?? 'событий не было' }}
+            {{ lastEventLabel ?? 'событий не было' }}
           </p>
           <p class="last-event">
-            уровень {{ level }} ·
-            аганим {{ milestones.aghanim ? 'есть' : 'нет' }} ·
-            шард {{ milestones.shard ? 'есть' : 'нет' }}
+            уровень {{ received?.hero.level ?? '—' }} ·
+            аганим {{ received?.hero.aghanimsScepter ? 'есть' : 'нет' }} ·
+            шард {{ received?.hero.aghanimsShard ? 'есть' : 'нет' }} ·
+            счёт {{ received ? `${received.map.radiantScore}:${received.map.direScore}` : '—' }}
           </p>
         </div>
       </section>

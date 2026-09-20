@@ -33,7 +33,17 @@ const REGISTRY: Record<VisualId, Component> = {
 
 const { visualId } = useVisual()
 const { state, impulse } = useAffect()
-const { lastEvent, milestones, level } = useReactions()
+const { lastEvent } = useReactions()
+const { snapshot } = useOverlayLink()
+
+// Вехи и уровень ВЫВОДЯТСЯ из снапшота, а не копятся параллельно. Так они
+// самовосстанавливаются при перезагрузке источника: накопленное состояние
+// пришлось бы досылать и сверять, а выведенное верно по построению.
+const milestones = computed(() => ({
+  aghanim: snapshot.value?.hero.aghanimsScepter ?? false,
+  shard: snapshot.value?.hero.aghanimsShard ?? false,
+}))
+const level = computed(() => snapshot.value?.hero.level ?? 0)
 
 const visual = computed(() => REGISTRY[visualId.value])
 

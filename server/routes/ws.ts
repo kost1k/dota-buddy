@@ -6,6 +6,10 @@ export default defineWebSocketHandler({
     const logger = createLogger(runtimeConfig.logLevel)
     wsService.add(peer)
     logger.info('[ws] client connected', { peerId: peer.id, totalPeers: wsService.count() })
+
+    // Клиент, открывшийся посреди матча, иначе не знал бы ни уровня, ни
+    // вех, ни счёта — а browser source в OBS перезагружается регулярно.
+    peer.send(JSON.stringify({ type: 'sync', snapshot: matchState.snapshot() }))
   },
 
   close(peer) {
