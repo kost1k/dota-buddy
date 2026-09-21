@@ -23,6 +23,29 @@ export interface ReplayStatus {
   speed: number
 }
 
+/** Подписи режимов. Рядом с данными, как у каталога событий. */
+export const REPLAY_MODE_LABELS: Record<ReplayMode, string> = {
+  idle: 'стоит',
+  playing: 'играет',
+  paused: 'пауза',
+}
+
+/**
+ * Какой пакет сейчас показан.
+ *
+ * `index` и `seek` меряют РАЗНОЕ: первый — сколько пакетов уже сыграно,
+ * второй принимает номер того, который надо показать. Разница в единицу, и
+ * жила она одним символом в разметке пульта, где ползунок и подпись под ним
+ * расходились на этот самый пакет.
+ *
+ * Держим её здесь, у контракта, который её и породил: ползунку и `seek`
+ * нужны одни единицы, а подписи «пакет N из M» — другие, и это нормально,
+ * пока сказано вслух.
+ */
+export function shownPacket(status: ReplayStatus): number {
+  return Math.max(status.index - 1, 0)
+}
+
 /** Состояние плюс то, из чего можно выбрать. */
 export interface ReplayState extends ReplayStatus {
   files: string[]

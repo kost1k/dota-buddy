@@ -13,6 +13,7 @@
 import type { AffectState } from './affect'
 import type { EscalationTier } from './escalation'
 import type { MilestoneKind } from './milestones'
+import { ESCALATION_TIERS } from './escalation'
 
 export interface EventKind {
   id: string
@@ -77,6 +78,18 @@ export interface BuddyEvent {
   /** Амплитуда, приглушённая свежестью, 0..1. */
   weight: number
   direction: AffectState
+}
+
+/**
+ * Строка о сработавшем событии для пульта: что это, какого яруса и с каким
+ * весом.
+ *
+ * Здесь, а не в разметке: собирается она из двух таблиц — каталога и ярусов,
+ * — и обе живут в `shared/`. Собирать её на странице значило бы держать там
+ * знание о том, как эти две таблицы связаны.
+ */
+export function eventSummary(kind: EventKind, weight: number): string {
+  return `${kind.label} → ${ESCALATION_TIERS[kind.tier].label}, вес ${weight.toFixed(2)}`
 }
 
 export function findEventKind(id: string): EventKind | undefined {

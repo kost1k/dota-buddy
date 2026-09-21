@@ -8,6 +8,7 @@ import { ingestRawBody } from '../server/utils/ingest'
 import { matchState } from '../server/utils/match-state'
 import { createReplayPlayer, listRecordings, packetDelay, parseRecording, readRecording, replayPlayer, resolveRecording } from '../server/utils/replay'
 import { deriveEvents } from '../shared/derive'
+import { REPLAY_MODE_LABELS, shownPacket } from '../shared/replay'
 import { readSnapshot } from '../shared/snapshot'
 import { baselineSnapshot } from '../shared/synthetic'
 
@@ -341,5 +342,45 @@ describe('плеер сервера', () => {
     replayPlayer.load('session.jsonl', [{ at: 1, body: {} }])
 
     expect(matchState.snapshot()).toBeNull()
+  })
+})
+
+describe('показываемый пакет', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('на единицу меньше сыгранного: `seek` и `index` меряют разное', () => {
+    // Сыграно 5 пакетов — показан пятый, у которого номер 4.
+    expect(shownPacket({ file: 'f', mode: 'playing', index: 5, total: 10, speed: 1 })).toBe(4)
+  })
+
+  it('до первого пакета не уходит в минус', () => {
+    expect(shownPacket({ file: null, mode: 'idle', index: 0, total: 0, speed: 1 })).toBe(0)
+  })
+
+  it('перемотка на показанный пакет не сдвигает картинку', () => {
+    // Смысл единицы: подать в `seek` то, что вернул `shownPacket`, — значит
+    // остаться на месте. Раньше это держалось на одном символе в разметке.
+    const packets = [0, 1, 2, 3, 4].map(n => ({ at: 1000 + n * 1000, body: { n } }))
+    const { player, played } = testPlayer(packets)
+
+    player.play()
+    vi.advanceTimersByTime(3000)
+    const before = player.status()
+    player.seek(shownPacket(before))
+
+    expect(played.at(-1)).toEqual(packets[shownPacket(before)]!.body)
+    expect(shownPacket(player.status())).toBe(shownPacket(before))
+  })
+})
+
+describe('подписи режимов', () => {
+  it('есть у каждого режима', () => {
+    for (const mode of ['idle', 'playing', 'paused'] as const)
+      expect(REPLAY_MODE_LABELS[mode]).toBeTruthy()
   })
 })
