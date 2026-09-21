@@ -10,7 +10,6 @@ import type { ReplayMode, ReplayStatus } from '#shared/replay'
 import { readdir, readFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import { ingestRawBody } from './ingest'
-import { matchState } from './match-state'
 
 /** Строка записи: метка приёма и сырое тело пакета, как его прислала Dota. */
 export interface RecordedPacket {
@@ -111,15 +110,20 @@ export function packetDelay(packets: RecordedPacket[], index: number, speed: num
 }
 
 /**
- * Куда плеер отдаёт пакеты и чем сбрасывает состояние матча.
+ * Куда плеер отдаёт пакеты.
  *
  * Зависимость вынесена наружу, чтобы плеер не знал ни про `matchState`, ни
  * про рассылку: темп и управление проверяются отдельно от пайплайна, иначе
  * тест на паузы тащил бы за собой весь вывод событий.
+ *
+ * Метод ОДИН намеренно. Раньше их было два, и слово «сброс» на другой
+ * стороне шва значило не то же самое: в production — молча, в приёме — с
+ * оповещением оверлеев. Пустое тело уже означает конец матча, так что
+ * отдельному методу нечего выражать, а порядок «сначала сброс, потом
+ * пакет» перестаёт быть устным договором — это просто два `ingest`.
  */
 export interface ReplaySink {
   ingest: (body: unknown) => void
-  reset: () => void
 }
 
 export function createReplayPlayer(sink: ReplaySink) {
@@ -129,6 +133,14 @@ export function createReplayPlayer(sink: ReplaySink) {
   let mode: ReplayMode = 'idle'
   let speed = 1
   let timer: ReturnType<typeof setTimeout> | null = null
+
+  /**
+   * Сброс состояния матча. Пустое тело — то же, чем Dota сообщает о конце
+   * матча и сессии; остановка воспроизведения этим и является.
+   */
+  function resetMatch() {
+    sink.ingest({})
+  }
 
   function clearTimer() {
     if (timer !== null) {
@@ -170,7 +182,7 @@ export function createReplayPlayer(sink: ReplaySink) {
       mode = 'idle'
       // Другой файл — заведомо другой матч: без сброса в состоянии остались
       // бы уровень, вехи и свежесть от предыдущего.
-      sink.reset()
+      resetMatch()
     },
 
     play() {
@@ -212,7 +224,7 @@ export function createReplayPlayer(sink: ReplaySink) {
 
       const clamped = Math.max(0, Math.min(Math.trunc(target), packets.length - 1))
       clearTimer()
-      sink.reset()
+      resetMatch()
       sink.ingest(packets[clamped]!.body)
       index = clamped + 1
 
@@ -240,7 +252,7 @@ export function createReplayPlayer(sink: ReplaySink) {
       clearTimer()
       index = 0
       mode = 'idle'
-      sink.reset()
+      resetMatch()
     },
 
     status(): ReplayStatus {
@@ -258,5 +270,4 @@ export function createReplayPlayer(sink: ReplaySink) {
  */
 export const replayPlayer = createReplayPlayer({
   ingest: body => ingestRawBody(body),
-  reset: () => matchState.reset(),
 })

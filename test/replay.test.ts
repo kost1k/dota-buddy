@@ -73,13 +73,27 @@ describe('темп воспроизведения', () => {
   })
 })
 
-/** Плеер, отвязанный от сервера: вместо приёма — сборщик тел. */
+/** Пустое тело — то же, чем Dota сообщает о конце матча: это и есть сброс. */
+function isReset(body: unknown) {
+  return typeof body === 'object' && body !== null && Object.keys(body).length === 0
+}
+
+/**
+ * Плеер, отвязанный от сервера: вместо приёма — сборщик тел.
+ *
+ * Сбросы считаются по пустым телам, а не отдельным методом: у шва один метод,
+ * и тест смотрит ровно на то, что видит production.
+ */
 function testPlayer(packets: { at: number, body: unknown }[]) {
   const played: unknown[] = []
   let resets = 0
   const player = createReplayPlayer({
-    ingest: body => played.push(body),
-    reset: () => { resets += 1 },
+    ingest: (body) => {
+      if (isReset(body))
+        resets += 1
+      else
+        played.push(body)
+    },
   })
   player.load('session.jsonl', packets)
   // Счётчик обнуляется после загрузки: она сама сбрасывает состояние, и без
