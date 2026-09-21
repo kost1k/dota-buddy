@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { AffectState } from '#shared/affect'
 import { AFFECT_PRESET_LABELS, AFFECT_PRESETS, AFFECT_RANGE, NEUTRAL_AFFECT, normalizeAffect } from '#shared/affect'
-import { ESCALATION_TIERS } from '#shared/escalation'
-import { EVENT_KINDS, eventSummary } from '#shared/events'
+import { ESCALATION_TIERS, EVENT_KINDS, eventSummary } from '#shared/events'
 import { REPLAY_MODE_LABELS, REPLAY_SPEEDS, shownPacket } from '#shared/replay'
 import { SCENARIOS } from '#shared/synthetic'
 import { VISUALS } from '#shared/visual'

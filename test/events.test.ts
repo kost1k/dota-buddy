@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ESCALATION_TIERS } from '../shared/escalation'
-import { EVENT_KINDS, eventSummary, findEventKind } from '../shared/events'
+import { ESCALATION_TIERS, EVENT_KINDS, eventSummary, findEventKind } from '../shared/events'
 
 /**
  * Каталог событий и подпись к сработавшему.
