@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import type { AffectState } from '#shared/affect'
-import type { ReplayMode } from '#shared/replay'
-import { AFFECT_PRESETS, AFFECT_RANGE, NEUTRAL_AFFECT } from '#shared/affect'
+import { AFFECT_PRESET_LABELS, AFFECT_PRESETS, AFFECT_RANGE, NEUTRAL_AFFECT, normalizeAffect } from '#shared/affect'
 import { ESCALATION_TIERS } from '#shared/escalation'
-import { EVENT_KINDS } from '#shared/events'
-import { REPLAY_SPEEDS } from '#shared/replay'
+import { EVENT_KINDS, eventSummary } from '#shared/events'
+import { REPLAY_MODE_LABELS, REPLAY_SPEEDS, shownPacket } from '#shared/replay'
 import { SCENARIOS } from '#shared/synthetic'
 import { VISUALS } from '#shared/visual'
 
@@ -20,7 +19,7 @@ import { VISUALS } from '#shared/visual'
 
 useHead({ title: 'Dota Buddy — пульт' })
 
-const { state, target, setBase, setState } = useAffect()
+const { state, target, setBase, setState, clearReactions } = useAffect()
 const { visualId, setVisual } = useVisual()
 const { fire } = useReactions()
 const sender = useSnapshotSender()
@@ -31,12 +30,6 @@ const replayTotal = computed(() => replay.state.value?.total ?? 0)
 const replayIndex = computed(() => replay.state.value?.index ?? 0)
 const replayLoaded = computed(() => replayTotal.value > 0)
 const replayPlaying = computed(() => replay.state.value?.mode === 'playing')
-
-const REPLAY_MODE_LABELS: Record<ReplayMode, string> = {
-  idle: 'стоит',
-  playing: 'играет',
-  paused: 'пауза',
-}
 
 /**
  * Ползунок перемотки ведёт СВОЁ значение, а не серверное.
@@ -49,10 +42,10 @@ const REPLAY_MODE_LABELS: Record<ReplayMode, string> = {
 const scrubbing = ref(false)
 const scrubValue = ref(0)
 
-watch(replayIndex, (value) => {
-  if (!scrubbing.value)
-    scrubValue.value = Math.max(value - 1, 0)
-}, { immediate: true })
+watch(() => replay.state.value, (status) => {
+  if (!scrubbing.value && status)
+    scrubValue.value = shownPacket(status)
+}, { immediate: true, deep: true })
 
 function commitSeek() {
   scrubbing.value = false
@@ -89,31 +82,24 @@ function release() {
  * между итерациями визуала, а не в наблюдении за переходом.
  */
 function applyPreset(point: AffectState) {
+  // След события обнуляется: цель есть `base + offset`, и без сброса пресет
+  // ставил бы не ту точку, которую называет. «Отпустить» ниже этим не
+  // пользуется намеренно — там инерция и есть смысл кнопки.
+  clearReactions()
   setBase(point)
   setState(point)
-}
-
-const PRESET_LABELS: Record<keyof typeof AFFECT_PRESETS, string> = {
-  calmFarm: 'Спокойный фарм',
-  onFire: 'Кураж',
-  panic: 'Паника',
-  defeated: 'Подавленность',
 }
 
 function fireEvent(kind: (typeof EVENT_KINDS)[number]) {
   const event = fire(kind.id)
   if (event)
-    lastEventLabel.value = `${kind.label} → ${ESCALATION_TIERS[kind.tier].label}, вес ${event.weight.toFixed(2)}`
+    lastEventLabel.value = eventSummary(kind, event.weight)
 }
 
-/** Координаты точки на плоскости в процентах, для графика. */
+/** Доли от диапазона — в проценты для графика. Считает домен, верстает это. */
 function plot(point: AffectState) {
-  const [vMin, vMax] = AFFECT_RANGE.valence
-  const [aMin, aMax] = AFFECT_RANGE.arousal
-  return {
-    left: `${((point.valence - vMin) / (vMax - vMin)) * 100}%`,
-    bottom: `${((point.arousal - aMin) / (aMax - aMin)) * 100}%`,
-  }
+  const unit = normalizeAffect(point)
+  return { left: `${unit.valence * 100}%`, bottom: `${unit.arousal * 100}%` }
 }
 
 const fmt = (n: number) => n.toFixed(3)
@@ -236,7 +222,7 @@ const fmt = (n: number) => n.toFixed(3)
               type="button"
               @click="applyPreset(point)"
             >
-              {{ PRESET_LABELS[key] }}
+              {{ AFFECT_PRESET_LABELS[key] }}
             </button>
           </div>
         </div>
@@ -355,6 +341,11 @@ const fmt = (n: number) => n.toFixed(3)
               @change="commitSeek"
             >
 
+            <!--
+              Подпись считает СЫГРАННЫЕ пакеты, ползунок выше показывает
+              ПОКАЗАННЫЙ, поэтому она на единицу больше. Так и надо: человеку
+              нужно «сколько прошло», ползунку — номер для `seek`.
+            -->
             <p class="last-event">
               {{ replay.state.value ? REPLAY_MODE_LABELS[replay.state.value.mode] : '—' }} ·
               пакет {{ replayIndex }} из {{ replayTotal }} ·

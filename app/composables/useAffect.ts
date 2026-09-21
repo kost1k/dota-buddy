@@ -70,6 +70,22 @@ export function useAffect() {
   }
 
   /**
+   * Сброс быстрых слоёв — следа и толчка. ТОЛЬКО для пульта.
+   *
+   * Нужен пресетам: они обещают точную воспроизводимость между итерациями
+   * визуала, а цель есть `base + offset`. Без сброса пресет, нажатый вскоре
+   * после события, ставит не ту точку, которую называет, и два одинаковых
+   * нажатия дают разную картинку — след затухает 25 секунд.
+   *
+   * «Отпустить» этим НЕ пользуется намеренно: там инерция и есть смысл
+   * кнопки.
+   */
+  function clearReactions() {
+    offset.value = { ...NEUTRAL_AFFECT }
+    impulse.value = { ...NEUTRAL_AFFECT }
+  }
+
+  /**
    * Прямая запись состояния, в обход инерции. ТОЛЬКО для пульта: в
    * рантайме состояние обязано меняться лишь через `tick`, иначе теряется
    * плавность, ради которой выбрана непрерывная модель (ADR-0001).
@@ -78,5 +94,5 @@ export function useAffect() {
     state.value = { ...state.value, ...next }
   }
 
-  return { state, base, offset, impulse, target, tick, setBase, addOffset, addImpulse, setState }
+  return { state, base, offset, impulse, target, tick, setBase, addOffset, addImpulse, clearReactions, setState }
 }
