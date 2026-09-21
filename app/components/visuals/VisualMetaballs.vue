@@ -3,9 +3,7 @@ import type { VisualProps } from '#shared/visual'
 import { MarchingCube, MarchingCubes } from '@tresjs/cientos'
 import { useLoop } from '@tresjs/core'
 import { Color } from 'three'
-import { clampAffect } from '#shared/affect'
 import { breathHz } from '#shared/motion'
-import { bodyColor, toHex } from '#shared/palette'
 
 /**
  * Визуал: метасферы. Слияние против распада.
@@ -40,14 +38,10 @@ const tint = new Color()
 const { onBeforeRender } = useLoop()
 
 onBeforeRender(({ elapsed }) => {
-  const { asleep } = props
-  const { valence, arousal } = clampAffect({
-    valence: props.valence + props.impulse.valence,
-    arousal: props.arousal + props.impulse.arousal,
-  })
-  const sleepy = asleep ? 0.25 : 1
+  const { valence, arousal } = props.affect
+  const sleepy = props.sleepy
 
-  tint.set(toHex(bodyColor(valence, arousal)))
+  tint.set(props.tint)
   const field = cubesRef.value?.instance ?? cubesRef.value
   if (field?.material?.color)
     field.material.color.copy(tint)

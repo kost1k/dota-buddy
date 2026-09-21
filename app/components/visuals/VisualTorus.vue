@@ -2,10 +2,8 @@
 import type { VisualProps } from '#shared/visual'
 import { useLoop } from '@tresjs/core'
 import { Color } from 'three'
-import { clampAffect } from '#shared/affect'
 import { MAX_LEVEL } from '#shared/milestones'
 import { breathHz } from '#shared/motion'
-import { bodyColor, toHex } from '#shared/palette'
 import { createShuffleBag } from '#shared/shuffle-bag'
 
 /**
@@ -73,20 +71,16 @@ const shardRef = shallowRef()
 const { onBeforeRender } = useLoop()
 
 onBeforeRender(({ elapsed }) => {
-  const { asleep } = props
-  const sleepy = asleep ? 0.25 : 1
-  // Контракт отдаёт состояние и импульс раздельно, потому что быстрый слой
-  // живёт по своим правилам; рисуется их сумма.
-  const { valence, arousal } = clampAffect({
-    valence: props.valence + props.impulse.valence,
-    arousal: props.arousal + props.impulse.arousal,
-  })
+  const sleepy = props.sleepy
+  const { valence, arousal } = props.affect
+  // Сырой импульс нужен отдельно от суммы: это СИЛА рывка, она правит
+  // профиль удара и подскок масштаба, а не положение на плоскости.
   const kick = Math.hypot(props.impulse.valence, props.impulse.arousal)
   const mesh = ringRef.value
   if (!mesh)
     return
 
-  tint.set(toHex(bodyColor(valence, arousal)))
+  tint.set(props.tint)
   mesh.material.color.copy(tint)
 
   // Новое событие — новый профиль. Сравниваем по id, а не по ссылке:
@@ -185,6 +179,9 @@ onBeforeRender(({ elapsed }) => {
   if (!root)
     return
   const breath = Math.sin(elapsed * breathHz(arousal) * Math.PI * 2)
+  // База 0.025 против 0.02 у кристалла и супершейпа — настройка, не остаток.
+  // Моторика у каждого визуала своя и пока подобрана только здесь;
+  // остальные четыре несут базовое состояние и ещё будут настраиваться.
   const s = 1 + breath * (0.025 + arousal * 0.07) * sleepy + kick * 0.14
   root.scale.set(s, s, s)
   // Наклон, а не вращение в плоскости: плоское кольцо анфас теряет

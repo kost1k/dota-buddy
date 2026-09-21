@@ -2,9 +2,7 @@
 import type { VisualProps } from '#shared/visual'
 import { Superformula } from '@tresjs/cientos'
 import { useLoop } from '@tresjs/core'
-import { clampAffect } from '#shared/affect'
 import { breathHz } from '#shared/motion'
-import { bodyColor, toHex } from '#shared/palette'
 
 /**
  * Визуал: супершейп. Форма ведёт валентность.
@@ -28,14 +26,8 @@ const rootRef = shallowRef()
 const materialRef = shallowRef()
 
 /** −1 → колючая звезда, +1 → собранная округлая форма. */
-/** Состояние и импульс складываются через зажим — сумма выходит за диапазон. */
-const rendered = computed(() => clampAffect({
-  valence: props.valence + props.impulse.valence,
-  arousal: props.arousal + props.impulse.arousal,
-}))
-
 const shape = computed(() => {
-  const t = (rendered.value.valence + 1) / 2
+  const t = (props.affect.valence + 1) / 2
   // Направление показателей неочевидно и я сперва задал его наоборот.
   // Шипы даёт ВЫСОКИЙ n2/n3 при низком n1; понижение всех трёх разом
   // стягивает тело в песочные часы, теряя силуэт вместо заострения.
@@ -47,8 +39,6 @@ const shape = computed(() => {
   const n23 = 4.2 - t * 2.2
   return [n1, n23, n23] as [number, number, number]
 })
-
-const hex = computed(() => toHex(bodyColor(rendered.value.valence, rendered.value.arousal)))
 
 /**
  * Компенсация габарита, посчитанная, а не подобранная.
@@ -69,9 +59,8 @@ const fit = computed(() => {
 const { onBeforeRender } = useLoop()
 
 onBeforeRender(({ elapsed }) => {
-  const { asleep } = props
-  const arousal = rendered.value.arousal
-  const sleepy = asleep ? 0.25 : 1
+  const arousal = props.affect.arousal
+  const sleepy = props.sleepy
   const root = rootRef.value
   if (!root)
     return
@@ -96,7 +85,7 @@ onBeforeRender(({ elapsed }) => {
     >
       <TresMeshStandardMaterial
         ref="materialRef"
-        :color="hex"
+        :color="props.tint"
         :roughness="0.55"
         :metalness="0.1"
         :flat-shading="true"

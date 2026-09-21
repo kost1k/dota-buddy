@@ -2,9 +2,7 @@
 import type { VisualProps } from '#shared/visual'
 import { useLoop } from '@tresjs/core'
 import { Color } from 'three'
-import { clampAffect } from '#shared/affect'
 import { breathAmplitude, breathHz } from '#shared/motion'
-import { bodyColor, toHex } from '#shared/palette'
 
 /**
  * Визуал: существо с глазом. Лицевой контроль набора.
@@ -42,16 +40,10 @@ let blinkProgress = 1
 const { onBeforeRender } = useLoop()
 
 onBeforeRender(({ delta, elapsed }) => {
-  const { asleep } = props
-  // Импульс складывается с состоянием: контракт отдаёт их раздельно,
-  // потому что быстрый слой живёт по своим правилам, но рисуется сумма.
-  const { valence, arousal } = clampAffect({
-    valence: props.valence + props.impulse.valence,
-    arousal: props.arousal + props.impulse.arousal,
-  })
-  const sleepy = asleep ? 0.25 : 1
+  const { valence, arousal } = props.affect
+  const sleepy = props.sleepy
 
-  tint.set(toHex(bodyColor(valence, arousal)))
+  tint.set(props.tint)
   for (const ref of [bodyRef, upperLidRef, lowerLidRef]) {
     if (ref.value)
       ref.value.material.color.copy(tint)

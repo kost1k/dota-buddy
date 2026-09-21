@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { VisualId, VisualProps } from '#shared/visual'
+import { renderAffect } from '#shared/visual'
 import VisualCrystal from './visuals/VisualCrystal.vue'
 import VisualEye from './visuals/VisualEye.vue'
 import VisualMetaballs from './visuals/VisualMetaballs.vue'
@@ -47,14 +48,22 @@ const level = computed(() => snapshot.value?.hero.level ?? 0)
 
 const visual = computed(() => REGISTRY[visualId.value])
 
+// Сумма состояния с импульсом, приглушение сном и цвет считаются ЗДЕСЬ, один
+// раз: раньше эти три строки были в каждом из пяти визуалов.
+const rendered = computed(() => renderAffect({
+  state: state.value,
+  impulse: impulse.value,
+  asleep: props.asleep,
+}))
+
 const visualProps = computed<VisualProps>(() => ({
-  valence: state.value.valence,
-  arousal: state.value.arousal,
+  affect: rendered.value.affect,
+  sleepy: rendered.value.sleepy,
+  tint: rendered.value.tint,
   impulse: impulse.value,
   event: lastEvent.value,
   milestones: milestones.value,
   level: level.value,
-  asleep: props.asleep,
 }))
 
 const probed = ref(false)
