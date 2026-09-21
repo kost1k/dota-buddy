@@ -1,7 +1,7 @@
 import type { BuddyEvent } from '../shared/events'
 import type { LinkEffect, LinkState } from '../shared/overlay-link'
 import { describe, expect, it } from 'vitest'
-import { EMPTY_LINK_STATE, reduceOverlayMessage } from '../shared/overlay-link'
+import { EMPTY_LINK_STATE, isAwake, reduceOverlayMessage } from '../shared/overlay-link'
 import { baselineSnapshot } from '../shared/synthetic'
 
 type Snap = ReturnType<typeof baselineSnapshot>
@@ -131,5 +131,39 @@ describe('связь оверлея', () => {
     reduceOverlayMessage(before, { type: 'state', snapshot: hurt(0.5) }, 1000)
 
     expect(before).toEqual(EMPTY_LINK_STATE)
+  })
+})
+
+/**
+ * Вторая половина правила живости: сколько тишины считается концом матча.
+ * Первую — какие сообщения будят — держит редьюсер выше.
+ *
+ * Время инжектируется, таймеров нет, поэтому тест не зависит от хода часов.
+ */
+const TIMEOUT = 15_000
+
+describe('isAwake', () => {
+  it('спит, пока не пришло ни одного сообщения', () => {
+    expect(isAwake(null, 1_000, TIMEOUT)).toBe(false)
+  })
+
+  it('бодрствует сразу после сообщения', () => {
+    expect(isAwake(1_000, 1_000, TIMEOUT)).toBe(true)
+  })
+
+  it('бодрствует, пока не истёк таймаут', () => {
+    expect(isAwake(1_000, 1_000 + TIMEOUT - 1, TIMEOUT)).toBe(true)
+  })
+
+  it('засыпает ровно на границе таймаута', () => {
+    expect(isAwake(1_000, 1_000 + TIMEOUT, TIMEOUT)).toBe(false)
+  })
+
+  it('спит, когда таймаут давно позади', () => {
+    expect(isAwake(1_000, 500_000, TIMEOUT)).toBe(false)
+  })
+
+  it('не засыпает, если часы качнулись назад', () => {
+    expect(isAwake(5_000, 4_000, TIMEOUT)).toBe(true)
   })
 })

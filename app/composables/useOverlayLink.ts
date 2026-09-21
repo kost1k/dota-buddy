@@ -2,7 +2,7 @@ import type { MatchSnapshot } from '#shared/snapshot'
 // Импорты явные, а не на автоимпорт Nuxt: он объявляет `shared/` в типах,
 // но в рантайме модуль не подтягивает — typecheck проходит, страница
 // падает. Ошибка молчаливая, поэтому лучше писать явно.
-import { isAwake } from '#shared/liveness'
+import { isAwake } from '#shared/overlay-link'
 
 /**
  * Ячейки связи. Пишет в них ТОЛЬКО плагин
