@@ -18,6 +18,44 @@
 import type { AffectState } from './affect'
 import type { BuddyEvent } from './events'
 import type { Milestones } from './milestones'
+import { clampAffect } from './affect'
+import { bodyColor, toHex } from './palette'
+
+/** Насколько во сне приглушается моторика. Один на все визуалы. */
+const SLEEP_DAMPING = 0.25
+
+export interface RenderedAffect {
+  /** Состояние плюс импульс, зажатое в диапазон осей. То, что рисуется. */
+  affect: AffectState
+  /** Множитель моторики: 1 бодрствует, 0.25 спит. */
+  sleepy: number
+  /** Цвет тела в виде `#rrggbb`. */
+  tint: string
+}
+
+/**
+ * Приводит аффект к тому, что визуал рисует.
+ *
+ * Считается ОДИН раз в сцене, а не в каждом визуале. Раньше эти три строки
+ * были в каждом из пяти — то есть правилом по договорённости, а не
+ * интерфейсом; шестой визуал написал бы своё, и шов бы этого не заметил.
+ *
+ * Сюда входит ровно то, что у визуалов действительно общее. Дыхание не
+ * входит намеренно: общая у них только частота, а применяют её кто к
+ * масштабу, кто к позиции, кто к разбросу долей, и с разными множителями.
+ */
+export function renderAffect(input: { state: AffectState, impulse: AffectState, asleep: boolean }): RenderedAffect {
+  const affect = clampAffect({
+    valence: input.state.valence + input.impulse.valence,
+    arousal: input.state.arousal + input.impulse.arousal,
+  })
+
+  return {
+    affect,
+    sleepy: input.asleep ? SLEEP_DAMPING : 1,
+    tint: toHex(bodyColor(affect.valence, affect.arousal)),
+  }
+}
 
 export interface VisualProps {
   /** −1..1, медленная ось. Состояние, без импульса. */
