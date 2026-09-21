@@ -27,19 +27,12 @@ export interface Milestones {
 
 export type MilestoneKind = 'aghanim' | 'shard'
 
-export const NO_MILESTONES: Milestones = { aghanim: false, shard: false }
-
-/** Общая достроенность, 0..1 — для непрерывных эффектов. */
-export function milestoneProgress({ aghanim, shard }: Milestones): number {
-  return ((aghanim ? 1 : 0) + (shard ? 1 : 0)) / 2
-}
-
-/** Применение вехи. Возвращает новый объект; повторное применение безвредно. */
-export function applyMilestone(current: Milestones, kind: MilestoneKind): Milestones {
-  return kind === 'aghanim'
-    ? { ...current, aghanim: true }
-    : { ...current, shard: true }
-}
+/*
+ * Накопителя вех здесь нет намеренно. Вехи ВЫВОДЯТСЯ из снапшота
+ * (`BuddyStage.vue`): так они самовосстанавливаются при перезагрузке
+ * browser source, тогда как накопленное состояние пришлось бы досылать и
+ * сверять. Копилка здесь когда-то была и не звалась ниоткуда.
+ */
 
 /**
  * Максимальный уровень героя в Dota 2. Нужен только для нормировки

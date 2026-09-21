@@ -23,6 +23,25 @@ describe('каталог событий', () => {
     }
   })
 
+  // Инвариант, который легко нарушить при добавлении события: веха без
+  // флага oneShot тратила бы свежесть, и однократное событие приглушалось
+  // бы неизвестно от чего.
+  it('каждое событие с вехой помечено как однократное', () => {
+    for (const kind of EVENT_KINDS) {
+      if (kind.milestone)
+        expect(kind.oneShot, `${kind.id}: веха без oneShot`).toBe(true)
+    }
+  })
+
+  it('амплитуда и направление в допустимых пределах', () => {
+    for (const kind of EVENT_KINDS) {
+      expect(kind.amplitude, kind.id).toBeGreaterThan(0)
+      expect(kind.amplitude, kind.id).toBeLessThanOrEqual(1)
+      expect(Math.abs(kind.direction.valence), kind.id).toBeLessThanOrEqual(1)
+      expect(Math.abs(kind.direction.arousal), kind.id).toBeLessThanOrEqual(1)
+    }
+  })
+
   it('находит по идентификатору и молчит на неизвестном', () => {
     expect(findEventKind('death')?.label).toBe('Смерть')
     expect(findEventKind('нет такого')).toBeUndefined()

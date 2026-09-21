@@ -56,17 +56,3 @@ export function breathHz(arousal: number): number {
 export function breathAmplitude(arousal: number, bodySize: number): number {
   return clamp01(arousal) * BREATH_AMPLITUDE_PEAK * bodySize
 }
-
-/**
- * Профиль минимального рывка: `10τ³ − 15τ⁴ + 6τ⁵`.
- *
- * Это спокойный пол движения. Ажитация выражается как отклонение от него —
- * тогда не нужно держать два набора анимаций и переключаться между ними,
- * что дало бы щелчок вместо непрерывности (ADR-0001).
- */
-export function minJerk(tau: number): number {
-  if (!Number.isFinite(tau))
-    return 0
-  const t = Math.min(Math.max(tau, 0), 1)
-  return t * t * t * (10 + t * (-15 + 6 * t))
-}
