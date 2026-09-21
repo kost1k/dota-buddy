@@ -229,6 +229,7 @@ event }` и рендерит. Больше он не знает ничего: н
 | Контракт визуала | `VisualProps` | `{ valence, arousal, milestones, escalationTier, event }` |
 | Аффект | `affect` | `{ valence: number, arousal: number }` |
 | Плоскость аффекта | `affectPlane` | — |
+| Отображаемый аффект | `renderedAffect` | состояние плюс импульс, зажатое, с цветом и коэффициентом сна |
 | Валентность | `valence` | `number`, −1..1 |
 | Возбуждение | `arousal` | `number`, 0..1 |
 | Вехи | `milestones` | накопитель структуры |
