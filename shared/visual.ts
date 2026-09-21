@@ -66,7 +66,6 @@ export type VisualId
     | 'torus'
     | 'metaballs'
     | 'crystal'
-    | 'breath'
 
 export interface VisualMeta {
   label: string
