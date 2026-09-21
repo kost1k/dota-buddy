@@ -13,7 +13,7 @@
     "test": "vitest run",
     "sanitize:recording": "bun run scripts/sanitize-recording.ts",
     "test:watch": "vitest",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "nuxt typecheck"
   },
   "dependencies": {
     "@tresjs/cientos": "^5.9.0",
