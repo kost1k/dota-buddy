@@ -44,6 +44,33 @@ export function clampAffect(state: AffectState): AffectState {
 export const NEUTRAL_AFFECT: AffectState = { valence: 0, arousal: 0 }
 
 /**
+ * Сложение двух точек аффекта с зажимом.
+ *
+ * Операция одна, мест два, и оба — про «медленное плюс быстрое»: цель
+ * складывается из объективной основы и следа события, отображаемое —
+ * из состояния и импульса. Зажим обязателен: сумма выходит за диапазон
+ * по построению, каждое слагаемое уже может стоять на краю.
+ */
+export function addAffect(a: AffectState, b: AffectState): AffectState {
+  return clampAffect({ valence: a.valence + b.valence, arousal: a.arousal + b.arousal })
+}
+
+/**
+ * Координаты точки на плоскости аффекта в долях `0..1` от диапазона осей.
+ *
+ * Отдаёт числа, а не проценты: проценты — вёрстка, и собирать их должен
+ * шаблон. Нужна пульту для графика, пригодится периферии.
+ */
+export function normalizeAffect(point: AffectState): AffectState {
+  const [vMin, vMax] = AFFECT_RANGE.valence
+  const [aMin, aMax] = AFFECT_RANGE.arousal
+  return {
+    valence: (point.valence - vMin) / (vMax - vMin),
+    arousal: (point.arousal - aMin) / (aMax - aMin),
+  }
+}
+
+/**
  * Стартовые значения. Подлежат калибровке на пульте — числа здесь
  * ориентировочные, важно лишь соотношение: возбуждение сильно быстрее.
  */
@@ -71,6 +98,14 @@ export const AFFECT_PRESETS = {
   /** Отстаём, отыгрываться нечем. */
   defeated: { valence: -0.7, arousal: 0.1 },
 } as const satisfies Record<string, AffectState>
+
+/** Подписи пресетов. Рядом с данными, как у каталога событий и ярусов. */
+export const AFFECT_PRESET_LABELS: Record<keyof typeof AFFECT_PRESETS, string> = {
+  calmFarm: 'Спокойный фарм',
+  onFire: 'Кураж',
+  panic: 'Паника',
+  defeated: 'Подавленность',
+}
 
 /**
  * Потолок одного шага. Если вкладку приморозили (OBS переключил сцену,

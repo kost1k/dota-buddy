@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  addAffect,
+  AFFECT_PRESET_LABELS,
+  AFFECT_PRESETS,
   AFFECT_RANGE,
   clampAffect,
   DEFAULT_AFFECT_TUNING,
   MAX_STEP_SECONDS,
   NEUTRAL_AFFECT,
+  normalizeAffect,
   stepAffect,
 } from '../shared/affect'
 
@@ -144,5 +148,48 @@ describe('clampAffect', () => {
   it('не трогает точку внутри диапазонов', () => {
     const inside = { valence: -0.3, arousal: 0.7 }
     expect(clampAffect(inside)).toEqual(inside)
+  })
+})
+
+describe('сложение и нормировка', () => {
+  it('складывает и зажимает: слагаемые уже могут стоять на краю', () => {
+    const sum = addAffect({ valence: 0.9, arousal: 0.8 }, { valence: 0.5, arousal: 0.7 })
+
+    expect(sum.valence).toBe(AFFECT_RANGE.valence[1])
+    expect(sum.arousal).toBe(AFFECT_RANGE.arousal[1])
+  })
+
+  it('внутри диапазона складывает как есть', () => {
+    const sum = addAffect({ valence: -0.3, arousal: 0.2 }, { valence: 0.1, arousal: 0.25 })
+
+    expect(sum.valence).toBeCloseTo(-0.2, 9)
+    expect(sum.arousal).toBeCloseTo(0.45, 9)
+  })
+
+  it('нейтраль не сдвигает', () => {
+    const point = { valence: -0.42, arousal: 0.37 }
+
+    expect(addAffect(point, NEUTRAL_AFFECT)).toEqual(point)
+  })
+
+  it('нормирует края диапазона в 0 и 1', () => {
+    const low = normalizeAffect({ valence: AFFECT_RANGE.valence[0], arousal: AFFECT_RANGE.arousal[0] })
+    const high = normalizeAffect({ valence: AFFECT_RANGE.valence[1], arousal: AFFECT_RANGE.arousal[1] })
+
+    expect(low).toEqual({ valence: 0, arousal: 0 })
+    expect(high).toEqual({ valence: 1, arousal: 1 })
+  })
+
+  it('нейтральная валентность нормируется в середину', () => {
+    // Ось валентности знаковая, возбуждения — нет: ноль у них в разных местах.
+    const mid = normalizeAffect(NEUTRAL_AFFECT)
+
+    expect(mid.valence).toBeCloseTo(0.5, 9)
+    expect(mid.arousal).toBeCloseTo(0, 9)
+  })
+
+  it('у каждого пресета есть подпись', () => {
+    for (const key of Object.keys(AFFECT_PRESETS))
+      expect(AFFECT_PRESET_LABELS[key as keyof typeof AFFECT_PRESETS]).toBeTruthy()
   })
 })

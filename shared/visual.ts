@@ -18,7 +18,7 @@
 import type { AffectState } from './affect'
 import type { BuddyEvent } from './events'
 import type { Milestones } from './milestones'
-import { clampAffect } from './affect'
+import { addAffect } from './affect'
 import { bodyColor, toHex } from './palette'
 
 /** Насколько во сне приглушается моторика. Один на все визуалы. */
@@ -45,10 +45,7 @@ export interface RenderedAffect {
  * масштабу, кто к позиции, кто к разбросу долей, и с разными множителями.
  */
 export function renderAffect(input: { state: AffectState, impulse: AffectState, asleep: boolean }): RenderedAffect {
-  const affect = clampAffect({
-    valence: input.state.valence + input.impulse.valence,
-    arousal: input.state.arousal + input.impulse.arousal,
-  })
+  const affect = addAffect(input.state, input.impulse)
 
   return {
     affect,

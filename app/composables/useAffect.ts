@@ -1,5 +1,5 @@
 import type { AffectState } from '#shared/affect'
-import { clampAffect, NEUTRAL_AFFECT, stepAffect } from '#shared/affect'
+import { addAffect, NEUTRAL_AFFECT, stepAffect } from '#shared/affect'
 import { stepImpulse } from '#shared/reaction'
 
 /**
@@ -29,10 +29,10 @@ export function useAffect() {
   const offset = useState<AffectState>('affect:offset', () => ({ ...NEUTRAL_AFFECT }))
   const impulse = useState<AffectState>('affect:impulse', () => ({ ...NEUTRAL_AFFECT }))
 
-  const target = computed(() => clampAffect({
-    valence: base.value.valence + offset.value.valence,
-    arousal: base.value.arousal + offset.value.arousal,
-  }))
+  // Цель — объективная основа плюс след события. Та же операция, что и в
+  // `renderAffect`, где складываются состояние с импульсом: медленное слагается
+  // с быстрым и зажимается.
+  const target = computed(() => addAffect(base.value, offset.value))
 
   function tick(deltaSeconds: number) {
     state.value = stepAffect(state.value, target.value, deltaSeconds)
