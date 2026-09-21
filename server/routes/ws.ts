@@ -9,7 +9,10 @@ export default defineWebSocketHandler({
 
     // Клиент, открывшийся посреди матча, иначе не знал бы ни уровня, ни
     // вех, ни счёта — а browser source в OBS перезагружается регулярно.
-    peer.send(JSON.stringify({ type: 'sync', snapshot: matchState.snapshot() }))
+    //
+    // Через `wsService`, а не прямым `peer.send`: только что подключившийся
+    // сокет — худший момент для отправки в обход защиты от обрыва.
+    wsService.send(peer, { type: 'sync', snapshot: matchState.snapshot() })
   },
 
   close(peer) {
