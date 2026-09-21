@@ -1,6 +1,6 @@
 import type { BuddyEvent } from '#shared/events'
 import type { MatchSnapshot } from '#shared/snapshot'
-import { deriveEvents, isMatchBoundary } from '#shared/derive'
+import { deriveEvents } from '#shared/derive'
 import { findEventKind } from '#shared/events'
 import { eventWeight, recoverFreshness, spendFreshness } from '#shared/reaction'
 
@@ -44,11 +44,13 @@ export const matchState = {
    * Вес считается ЗДЕСЬ и один раз. Пересчёт при отрисовке дал бы разный
    * результат в зависимости от того, когда на событие посмотрели: свежесть
    * к тому моменту успела бы восстановиться.
+   *
+   * Границу матча здесь НЕ ловим, хотя раньше ловили. Сброс обязан быть
+   * виден оверлею, а рассылка живёт в приёмном модуле — значит и решение о
+   * сбросе живёт там же (`endMatch` в `ingest.ts`). Два владельца одного
+   * правила разошлись бы молча.
    */
   ingest(next: MatchSnapshot, now = Date.now()): BuddyEvent[] {
-    if (isMatchBoundary(state.previous, next))
-      state = emptyState()
-
     const kinds = deriveEvents(state.previous, next)
     state.previous = next
 

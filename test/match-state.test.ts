@@ -69,21 +69,15 @@ describe('серверное состояние матча', () => {
     expect(ids[2]!).toBeGreaterThan(ids[0]!)
   })
 
-  it('граница матча сбрасывает и память, и свежесть', () => {
+  it('границу матча не ловит: это забота приёмного модуля', () => {
+    // Сброс обязан быть виден оверлею, а рассылка живёт в `ingest.ts` —
+    // значит и решение о сбросе там же. Здесь снапшот из другого матча это
+    // просто следующий снапшот. Поведение границы — в `ingest.test.ts`.
     matchState.reset()
-    matchState.ingest(snap())
-    const fresh = matchState.ingest(snap({ alive: false }))[0]!.weight
+    matchState.ingest(snap({ level: 9 }))
+    matchState.ingest(snap({ level: 9 }, {}, { matchId: 'next' }))
 
-    // Тот же матч: повтор приглушён.
-    matchState.ingest(snap({ alive: true }))
-    const damped = matchState.ingest(snap({ alive: false }))[0]!.weight
-    expect(damped).toBeLessThan(fresh)
-
-    // Новый матч: свежесть как в начале, а первый снапшот событий не даёт.
-    expect(matchState.ingest(snap({ alive: true }, {}, { matchId: 'next' }))).toEqual([])
-    matchState.ingest(snap({}, {}, { matchId: 'next' }))
-    const afterBoundary = matchState.ingest(snap({ alive: false }, {}, { matchId: 'next' }))[0]!.weight
-    expect(afterBoundary).toBeCloseTo(fresh, 9)
+    expect(matchState.snapshot()!.map.matchId).toBe('next')
   })
 
   it('хранит последний снапшот для синхронизации', () => {

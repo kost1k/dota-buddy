@@ -1,5 +1,6 @@
 import type { BuddyEvent } from '#shared/events'
 import type { MatchSnapshot } from '#shared/snapshot'
+import { isMatchBoundary } from '#shared/derive'
 import { readSnapshot } from '#shared/snapshot'
 import { matchState } from './match-state'
 import { wsService } from './ws'
@@ -22,16 +23,35 @@ export type IngestResult
   = | { mode: 'idle' }
     | { mode: 'state', snapshot: MatchSnapshot, events: BuddyEvent[] }
 
+/**
+ * Конец матча: память сбрасывается И оверлеи узнают об этом. Всегда вместе.
+ *
+ * Врозь эти два действия разошлись: сброс на границе матча и при остановке
+ * воспроизведения молчал, и оверлей продолжал рисовать картину прошлого
+ * матча до таймаута живости — пятнадцать секунд. Поэтому у сброса здесь одно
+ * имя и одно место, и других поводов сбрасывать память матча быть не должно.
+ */
+function endMatch() {
+  matchState.reset()
+  wsService.broadcast({ type: 'idle' })
+}
+
 export function ingestRawBody(body: unknown): IngestResult {
   // Dota шлёт пустой объект при окончании матча или сессии. Это не ошибка, а
   // переход в сон — и заодно граница, после которой состояние матча больше
   // не имеет смысла.
   const snapshot = readSnapshot(body)
   if (!snapshot) {
-    matchState.reset()
-    wsService.broadcast({ type: 'idle' })
+    endMatch()
     return { mode: 'idle' }
   }
+
+  // Граница матча ловится ЗДЕСЬ, а не внутри памяти матча: сброс обязан
+  // быть виден оверлею, а память про сокет не знает и знать не должна.
+  // Клиент получит `idle`, следом `state`, и войдёт в новый матч чистым —
+  // без накопленного урона и следа события от прошлого.
+  if (isMatchBoundary(matchState.snapshot(), snapshot))
+    endMatch()
 
   const events = matchState.ingest(snapshot)
 

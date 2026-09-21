@@ -63,4 +63,57 @@ describe('приём сырого тела', () => {
 
     expect(messages.map(m => m.type)).toEqual(['state', 'event'])
   })
+
+  it('пустое тело оповещает оверлеи, а не только чистит память', () => {
+    const base = baselineSnapshot()
+    ingestRawBody(buildRawSnapshot(base))
+
+    const { messages, done } = collectBroadcasts()
+    ingestRawBody({})
+    done()
+
+    expect(messages.map(m => m.type)).toEqual(['idle'])
+    expect(matchState.snapshot()).toBeNull()
+  })
+
+  it('граница матча оповещает оверлеи, потом отдаёт новое состояние', () => {
+    // Сброс молча оставлял оверлей с накопленным уроном и следом события от
+    // прошлого матча: он узнавал о новом матче только по следующему `state`.
+    const base = baselineSnapshot()
+    ingestRawBody(buildRawSnapshot(base))
+
+    const { messages, done } = collectBroadcasts()
+    ingestRawBody(buildRawSnapshot({
+      ...base,
+      map: { ...base.map, matchId: 'next' },
+    }))
+    done()
+
+    expect(messages.map(m => m.type)).toEqual(['idle', 'state'])
+  })
+
+  it('граница матча возвращает свежесть к начальной', () => {
+    const base = baselineSnapshot()
+    const at = (patch: Partial<typeof base.hero>, matchId = base.map.matchId) =>
+      buildRawSnapshot({ ...base, hero: { ...base.hero, ...patch }, map: { ...base.map, matchId } })
+
+    ingestRawBody(at({}))
+    const first = ingestRawBody(at({ alive: false }))
+    const fresh = first.mode === 'state' ? first.events[0]!.weight : 0
+
+    // Тот же матч: повтор приглушён.
+    ingestRawBody(at({ alive: true }))
+    const again = ingestRawBody(at({ alive: false }))
+    const damped = again.mode === 'state' ? again.events[0]!.weight : 0
+    expect(damped).toBeLessThan(fresh)
+
+    // Новый матч: первый снапшот событий не даёт, свежесть как в начале.
+    const boundary = ingestRawBody(at({ alive: true }, 'next'))
+    expect(boundary.mode === 'state' && boundary.events).toEqual([])
+
+    ingestRawBody(at({}, 'next'))
+    const after = ingestRawBody(at({ alive: false }, 'next'))
+    const afterBoundary = after.mode === 'state' ? after.events[0]!.weight : 0
+    expect(afterBoundary).toBeCloseTo(fresh, 9)
+  })
 })
