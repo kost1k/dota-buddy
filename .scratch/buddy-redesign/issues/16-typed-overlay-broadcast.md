@@ -11,7 +11,7 @@ Type: task
 
 ```ts
 // server/utils/ws.ts:19
-broadcast: (message: unknown) => { … }
+broadcast: (message: unknown) => { /* ... */ }
 ```
 
 `unknown` стирает контракт ровно на том шве, ради которого модуль

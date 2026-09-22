@@ -9,11 +9,12 @@ Type: task
 же самое.
 
 ```ts
-// server/utils/replay.ts — production
-reset: () => matchState.reset()          // сброс молча
+// server/utils/replay.ts — production: сброс молча
+reset: () => matchState.reset()
 
-// server/utils/ingest.ts — пустое тело
-matchState.reset(); wsService.broadcast({ type: 'idle' })   // сброс с оповещением
+// server/utils/ingest.ts — пустое тело: сброс с оповещением
+matchState.reset()
+wsService.broadcast({ type: 'idle' })
 ```
 
 Интерфейс из двух методов дополнительно требует от вызывающего знать
